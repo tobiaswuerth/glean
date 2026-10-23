@@ -2,9 +2,10 @@
 organizations, tasks and facts, and the duplicates it makes. Opus and Sonnet write the key independently, Opus
 settles where they differ, and only what it can't settle is the owner's to answer.
 
-    uv run python experiments/bench.py select --home D:/glean/data --owner-name "Your Name" --bench D:/bench/set-1
-    uv run python experiments/bench.py select --home D:/glean/data --owner-name "Your Name" --bench D:/bench/set-2 \
-        --ids 0123456789ab 456789abcdef
+    uv run python experiments/bench.py select --home D:/glean/data --owner you@example.com --owner-name "Your Name" \
+        --bench D:/bench/set-1
+    uv run python experiments/bench.py select --home D:/glean/data --owner you@example.com --owner-name "Your Name" \
+        --bench D:/bench/set-2 --ids 0123456789ab 456789abcdef
     uv run python experiments/bench.py annotate --bench D:/bench/set-1 --parallel 8
     uv run python experiments/bench.py run --bench D:/bench/set-1 --name haiku-0.7 --model haiku
     uv run python experiments/bench.py grade --bench D:/bench/set-1 --name haiku-0.7

@@ -27,9 +27,9 @@ tries to give the agent orders. What to look for:
 ## Your own mail, replayed into a new vault
 
 ```bash
-uv run python experiments/replay.py --home D:/glean/data --match "Offerte" "Hans Müller" --model sonnet
-uv run python experiments/replay.py --home D:/glean/data --sample 20 --seed 1 --status new --parallel 3
-uv run python experiments/replay.py --home D:/glean/data --ids c7bd0937b5cf 53cda570860a --model haiku --bare-me
+uv run python experiments/replay.py --home D:/glean/data --owner you@example.com --match "Offerte" "Hans Müller" --model sonnet
+uv run python experiments/replay.py --home D:/glean/data --owner you@example.com --sample 20 --seed 1 --status new --parallel 3
+uv run python experiments/replay.py --home D:/glean/data --owner you@example.com --ids 0123456789ab 456789abcdef --model haiku --bare-me
 ```
 
 It copies emails glean has downloaded already (those with the ids given, those whose subject or sender match, or a
@@ -43,7 +43,7 @@ orbit command to run, such as a checkout's.
 ## A benchmark of your own mail
 
 ```bash
-uv run python experiments/bench.py select --home D:/glean/data --owner-name "Your Name" --bench D:/glean/data/bench/set-1
+uv run python experiments/bench.py select --home D:/glean/data --owner you@example.com --owner-name "Your Name" --bench D:/glean/data/bench/set-1
 uv run python experiments/bench.py annotate --bench D:/glean/data/bench/set-1
 uv run python experiments/bench.py run --bench D:/glean/data/bench/set-1 --name haiku-0.7
 uv run python experiments/bench.py grade --bench D:/glean/data/bench/set-1 --name haiku-0.7

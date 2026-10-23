@@ -1,8 +1,10 @@
 """Replay emails glean downloaded already into a new vault, with the real agent, and score the result: for trying
 prompts and models on real mail with nothing real at stake. Reads the given glean home; writes only into --dir.
 
-    uv run python experiments/replay.py --home D:/glean/data --match "Offerte" "Hans Müller" --model sonnet
-    uv run python experiments/replay.py --home D:/glean/data --sample 20 --seed 1 --status new done
+    uv run python experiments/replay.py --home D:/glean/data --owner you@example.com --model sonnet \
+        --match "Offerte" "Hans Müller"
+    uv run python experiments/replay.py --home D:/glean/data --owner you@example.com --sample 20 --seed 1 \
+        --status new done
 
 The emails are copied into a folder of .eml files (one subfolder per mail folder), glean downloads them from there
 into a home of its own, and imports them into a new orbit vault served on --port, with a sift of its own on
