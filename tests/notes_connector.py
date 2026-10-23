@@ -28,12 +28,15 @@ class Notes(Connector):
     def setup(cls, ask, say):
         return '[notes]\narchive = "notes"\n'
 
-    def download(self, state):
+    def download(self, state, oldest=None, latest=None):
         report = Downloaded()
-        for key, (date, title, text) in self.source.items():
-            if state.find(self.name, key):
-                report.known += 1
-                continue
+        new = sorted((date, key) for key, (date, _, _) in self.source.items() if not state.find(self.name, key))
+        report.known = len(self.source) - len(new)
+        count = oldest or latest
+        taken = new if count is None else new[:count] if oldest else new[-count:]
+        report.waiting = len(new) - len(taken)
+        for date, key in taken:
+            _, title, text = self.source[key]
             item_id = state.new_id(self.name, key)
             path = self.archive / item_id / "original.txt"
             archive.write_atomic(path, text.encode("utf-8"))

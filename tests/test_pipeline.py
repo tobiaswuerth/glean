@@ -47,6 +47,16 @@ def setup(tmp_path):
         yield cfg, notes, state
 
 
+def test_a_source_downloads_only_the_oldest_or_newest_it_is_asked_for(tmp_path):
+    # Every connector takes download's count; the smallest one shows how.
+    notes = Notes(Notes.configure(config.Table({}, "notes", tmp_path / "glean.toml")), tmp_path)
+    notes.source = {k: (f"2026-10-0{n}T09:00:00+02:00", k, k) for n, k in enumerate("cab", 1)}
+    with State(tmp_path, {"notes": notes.archive}, now=lambda: NOW) as state:
+        assert (notes.download(state, oldest=1).new, [i.key for i in state.items("notes")]) == (1, ["c"])
+        assert (notes.download(state, latest=1).waiting, [i.key for i in state.items("notes")]) == (1, ["b", "c"])
+        assert (notes.download(state).new, notes.download(state).known) == (1, 3)
+
+
 def test_choose_the_oldest_first(setup):
     # The CRM grows as the mailbox did: people and tasks first, then what follows from them.
     _, notes, state = setup
