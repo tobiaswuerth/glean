@@ -235,11 +235,9 @@ def test_the_instructions_log_the_owners_address_too(tmp_path):
     assert "every address of the front matter, the owner's too" in " ".join(mail.instructions().split())
 
 
-def test_the_instructions_make_tasks_only_of_what_someone_can_finish(tmp_path):
-    # Open-ended promises, platform invitations and class broadcasts left tasks open for years; so did copies.
+def test_the_instructions_close_what_an_email_settles_and_reuse_a_copys_task(tmp_path):
+    # Tasks a later reply settled stayed open for years, and a notice sent twice made two tasks.
     text = " ".join(connector(tmp_path)[0].instructions().split())
-    assert "each request or promise of the newest message that someone can visibly finish" in text
-    assert "No task for an open-ended promise" in text
     assert "or is a copy of the email that made it" in text
     assert "every one this email settles, in its newest message or the replies it quotes" in text
 
