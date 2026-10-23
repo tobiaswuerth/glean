@@ -1,6 +1,7 @@
 """The benchmark's logic (experiments/bench.py): picking emails, comparing two keys, reading a vault, grading."""
 
 import json
+import socket
 import sys
 from collections import Counter
 from pathlib import Path
@@ -39,6 +40,19 @@ def test_cases_come_with_the_earlier_emails_of_their_thread():
 def test_cases_name_ids_the_home_has():
     with pytest.raises(SystemExit, match="no emails with ids nope"):
         bench.cases([row(1)], ["e001", "nope"])
+
+
+def test_a_replay_refuses_a_port_another_server_holds(tmp_path):
+    # A leftover server on the port answered instead, with another vault, while the new one failed to start.
+    import trial
+
+    with socket.socket() as taken:
+        taken.bind(("127.0.0.1", 0))
+        taken.listen()
+        port = taken.getsockname()[1]
+        with pytest.raises(SystemExit, match=f"port {port} is in use"), trial.serving(tmp_path, tmp_path, "orbit", port,
+                                                                                         port + 1):  # fmt: skip
+            pass
 
 
 def test_short_threads_are_no_thread():

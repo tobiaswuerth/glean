@@ -21,12 +21,16 @@ from pathlib import Path
 from make_mail import mailbox
 
 
+def listening(port):
+    with socket.socket() as s:
+        return s.connect_ex(("127.0.0.1", port)) == 0
+
+
 def wait_for(port, seconds=30, name="orbit"):
     deadline = time.monotonic() + seconds
     while time.monotonic() < deadline:
-        with socket.socket() as s:
-            if s.connect_ex(("127.0.0.1", port)) == 0:
-                return
+        if listening(port):
+            return
         time.sleep(0.3)
     raise SystemExit(f"{name} didn't start on port {port}")
 
@@ -45,6 +49,8 @@ def serving(root, vault, orbit, port, sift_port):
     env = os.environ | {"ORBIT_HOME": str(root / "orbit-home"), "SIFT_HOME": str(root / "sift-home"),
                         "GLEAN_HOME": str(root / "home")}  # fmt: skip
     sift = shutil.which("sift") or sys.exit("sift isn't on PATH")
+    for taken in (p for p in (port, sift_port) if listening(p)):  # else that server answers, not ours
+        raise SystemExit(f"port {taken} is in use: stop what serves it, or give another port")
     started = []
     try:
         for cmd, at, name in (([orbit, "serve", str(vault), "--port", str(port)], port, "orbit"),
