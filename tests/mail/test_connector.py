@@ -165,6 +165,18 @@ def test_a_limited_download_over_imap_keeps_the_cursor_of_a_folder_with_mail_lef
     assert state.cursor("mail", "Inbox") == "1:3"
 
 
+def test_a_message_of_unknown_date_comes_after_the_dated_ones_either_way(tmp_path, monkeypatch):
+    server = FakeImap({"Inbox": {"validity": 1, "messages": {1: samples.plain(message_id="<undated@x>"),
+                                                             2: samples.plain(message_id="<dated@x>")}}})  # fmt: skip
+    server.undated.add(1)
+    mail, _ = connector(tmp_path)
+    monkeypatch.setattr(mail, "mailbox", lambda: imap.Imap("h", 993, "tobias@example.com", lambda: "T", server))
+    for which, home in (("oldest", tmp_path / "a"), ("latest", tmp_path / "b")):
+        with State(home, {"mail": home / "archive"}, now=lambda: NOW) as state:
+            mail.download(state, **{which: 1})
+            assert (state.find("mail", "dated@x") is None, state.find("mail", "undated@x") is None) == (False, True)
+
+
 def test_a_message_found_again_after_a_new_uidvalidity_is_known(tmp_path, state, monkeypatch):
     server = FakeImap({"Inbox": {"validity": 1, "messages": {1: samples.forwarded()}}})
     mail, _ = connector(tmp_path)
