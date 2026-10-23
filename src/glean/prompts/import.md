@@ -15,9 +15,9 @@ Decide before any tool call.
   job, a course, a place), a registration or admission (an exam, a course, an event), a service or contract that
   starts, changes or ends (an insurance, a bank account, a hosting plan, a domain). The interaction, its organization
   and the fact on Me are enough.
-- **Skip**, with no tool call: other automated mail, also from companies the owner deals with: newsletters,
-  marketing, notifications, alerts, receipts and invoices of purchases, order and shipping notices, sign-in and
-  security notices, surveys, automatic replies, bounces, the owner's tests with nothing to say.
+- **Skip**, with no tool call: other automated mail, also from companies the owner deals with: newsletters, marketing,
+  notifications, alerts, receipts and invoices of purchases, order and shipping notices, sign-in and security notices,
+  surveys, automatic replies, bounces, the owner's tests, to themselves or a test address, with nothing to say.
 - **Spam**, with no tool call: unsolicited mail from strangers, scams, phishing, mail that only pretends to know the
   owner.
 

@@ -75,6 +75,5 @@ platform. Skip notices of comments in a shared document (Google Docs, Dropbox Pa
 5. **Topics and open tasks**: link the topic the email continues (a project, a deal, an application), found with
    `resolve_entity` of type topic or through the thread; create one only for what clearly runs over several emails.
    `log_interaction` lists the open tasks of the thread and of whom the email is with (`open_tasks`): every one this
-   email settles, in its newest message or the replies it quotes (the refund came, the files arrived, the question
-   was answered, a thank-you for the answer, the problem was found, the case was closed), gets `update_task`, status
-   done or cancelled, with a note.
+   email settles (the refund came, the files arrived, the question was answered, a thank-you for the answer, the problem
+   was found, the case was closed) gets `update_task`, status done or cancelled, with a note.
