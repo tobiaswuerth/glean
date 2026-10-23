@@ -4,6 +4,8 @@ GLEAN_HOME/logs/mail-run-2026-10-23_210509.log. Every log is kept."""
 import contextlib
 import logging
 
+from . import __version__
+
 FORMAT = "%(asctime)s %(levelname)s %(message)s"
 
 
@@ -19,6 +21,7 @@ def kept(home, name, now):
     log, level = logging.getLogger("glean"), logging.getLogger("glean").level
     log.addHandler(handler)
     log.setLevel(logging.INFO)
+    log.info("glean %s, %s", __version__, name)  # the log's alone: which glean wrote it
     try:
         yield path
     except KeyboardInterrupt:

@@ -4,6 +4,7 @@ import datetime
 
 import pytest
 
+import glean
 from glean import console, logs
 
 NOW = datetime.datetime(2026, 10, 23, 21, 5, 9)
@@ -22,7 +23,8 @@ def test_a_log_holds_what_glean_said_and_how_it_ended(tmp_path, capsys):
     (path,) = (tmp_path / "logs").glob("*.log")
     assert path == tmp_path / "logs" / "mail-run-2026-10-23_210509.log"
     lines = [line.split(" ", 2)[2] for line in path.read_text(encoding="utf-8").splitlines()]
-    assert lines == ["INFO reviewing 2 imports", "INFO done    a1b2c3  Offer", "ERROR stopped"]
+    assert lines == [f"INFO glean {glean.__version__}, mail-run",  # which glean wrote it, for the log alone
+                     "INFO reviewing 2 imports", "INFO done    a1b2c3  Offer", "ERROR stopped"]  # fmt: skip
     console.say("after")
     assert "after" not in path.read_text(encoding="utf-8")
     assert capsys.readouterr() == ("done    a1b2c3  Offer\n", "reviewing 2 imports\nafter\n")
