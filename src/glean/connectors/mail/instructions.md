@@ -39,7 +39,8 @@ platform. Skip notices of comments in a shared document (Google Docs, Dropbox Pa
    organization ("Hans Müller" with "Acme"): it may be a note's alias.
    - Every sender and recipient who is a person is recorded, a bare address too. Their name is the one the email
      writes (signature, greeting, display name), umlauts and all ("Müller", not "Mueller"); else the one the address
-     spells (hans.mueller@… is Hans Mueller); else the address's handle (s1234), which a later email's name replaces.
+     spells, with or without dots and digits (hans.mueller@…, hansmueller7@…: Hans Mueller); else the address's
+     handle (s1234), which a later email's name replaces.
    - Someone named without an address is recorded when the email says who they are (a role, an organization, a
      relation); a first name alone is not enough.
    - Not people: role addresses (info@, support@, …), a mailbox named after a place, a team or an office
