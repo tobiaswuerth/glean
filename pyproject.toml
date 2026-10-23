@@ -1,0 +1,109 @@
+[build-system]
+requires = ["uv_build>=0.11.6,<0.14"]
+build-backend = "uv_build"
+
+[project]
+name = "glean-importer"
+version = "0.8.1"
+description = "Imports what your sources hold into orbit (a personal CRM) and sift (local RAG search), one sandboxed Claude Code agent run per item. Email works today: IMAP with OAuth2 (Outlook.com, Hotmail) or .eml files."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Tobias Würth" }]
+requires-python = ">=3.11"
+dependencies = [
+    "msal>=1.31",  # the OAuth2 sign-in to Microsoft, and refreshing its tokens
+    "msal-extensions>=1.2",  # the token cache, encrypted with the user's Windows login (DPAPI)
+    "inscriptis>=2.5",  # HTML mail to text, tables and lists kept readable (Apache-2.0)
+    "filelock>=3.16",  # one glean run at a time per home
+]
+keywords = [
+    "email",
+    "imap",
+    "oauth2",
+    "outlook",
+    "hotmail",
+    "crm",
+    "personal-crm",
+    "rag",
+    "mcp",
+    "claude-code",
+    "ai-agents",
+    "local-first",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Intended Audience :: End Users/Desktop",
+    "Operating System :: MacOS",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Programming Language :: Python :: 3.15",
+    "Natural Language :: English",
+    "Topic :: Communications :: Email",
+    "Topic :: Office/Business",
+    "Topic :: Text Processing :: Markup :: Markdown",
+]
+
+[project.urls]
+Homepage = "https://github.com/tobiaswuerth/glean"
+Documentation = "https://github.com/tobiaswuerth/glean#readme"
+Source = "https://github.com/tobiaswuerth/glean"
+Issues = "https://github.com/tobiaswuerth/glean/issues"
+Changelog = "https://github.com/tobiaswuerth/glean/blob/main/CHANGELOG.md"
+
+[project.scripts]
+glean = "glean.cli:main"
+
+[dependency-groups]
+test = [
+    "pytest>=8",
+    "pytest-cov>=5",
+    "pytest-timeout>=2.3",
+]
+dev = [
+    { include-group = "test" },
+    "ruff>=0.15",
+    "pre-commit>=4",
+]
+
+[tool.uv.build-backend]
+module-name = "glean"
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "C4", "PIE", "PT", "RUF", "PERF"]
+ignore = [
+    "B905",  # zip() without strict=
+    "SIM905",  # a word list as one split string reads better than a long list literal
+]
+
+[tool.ruff.lint.flake8-pytest-style]
+parametrize-names-type = "csv"  # @pytest.mark.parametrize("a, b", ...)
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = ["--strict-markers"]
+filterwarnings = ["error"]  # a warning today is a failure tomorrow
+timeout = 60  # a test that hangs fails instead
+
+[tool.coverage.run]
+source = ["glean"]
+branch = true
+
+[tool.coverage.report]
+fail_under = 100
+show_missing = true
+skip_covered = true
+
+[tool.codespell]
+ignore-words-list = "ue,foto,passt,ist,sie,ende,oktober,technik,unser"  # ü written as ue, and German in made-up mail

@@ -1,0 +1,265 @@
+# Changelog
+
+All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and versions follow [Semantic Versioning](https://semver.org/).
+
+## [Unreleased]
+
+## [0.8.1] - 2026-10-23
+
+### Changed
+
+- Prompts, tool descriptions, tests and docs use made-up examples only. Releases 0.2.0 to 0.8.0 are no longer on
+  PyPI.
+- Needs orbit 0.7.1 or newer, whose tools the review uses.
+
+## [0.8.0] - 2026-10-23
+
+Questions only the owner can answer, and answers in their own words.
+
+### Added
+
+- The review asks the owner what no email says (who a person is to them, whether an organization is their bank):
+  every question truly necessary, related ones put together, under a ceiling of 15 per 100 imports against
+  flooding, as orbit's open questions in `90_Review`; its report lists them. The owner answers in words, typed into
+  the `answer` column of orbit's Review table in Obsidian. The next review reads the answers first, records what they
+  say with the owner as the source, makes the corrections they call for, and settles each in orbit, once.
+
+### Changed
+
+- Needs orbit 0.7.0 (open questions answered in the Review base's table, `settle_review`); `glean doctor` says so for
+  an older one.
+
+## [0.7.0] - 2026-10-23
+
+Measured on a benchmark of 100 real emails, against 0.6.0 with the same model (Haiku): participants recall .86 →
+.98 at the same precision (.89 → .90), tasks recall .35 → .59, owner facts .50 → .58, people missed 5 → 2, verdicts
+.97 → .99, at about the same cost ($0.53 → $0.56 per 100 emails).
+
+### Added
+
+- A review after each run: one run of a stronger model (`[agent] review_model`, Opus by default) for every
+  `review_every` imports (100), reading a digest of each import, not the emails. It merges duplicates orbit's notes
+  prove, merges the owner's other notes into Me, corrects misplaced tasks and fields, makes items it finds wrongly
+  judged new to import again, and suggests changes to the importer's instructions; its report goes to
+  `runs/reviews/`. `glean mail review` reviews the latest imports when asked; `run --no-review` leaves it out. On the
+  benchmark's 100 emails it cost $1.15, merged a duplicate, closed an answered task, removed three guessed
+  relationships and named the two test mails imported by mistake.
+
+- A circuit breaker: a batch stops when 6 of its last 10 runs went wrong (failed, left work undone after the
+  follow-ups, or had calls refused), and names the most common cause; the items not yet run stay as they were.
+- glean's checks know the email's addresses: one of its From, To or Cc that the interaction doesn't name, nor the
+  report, sends the run back. An agent had logged a class's email with only the owner in To, so orbit listed none of
+  the twelve others as unknown.
+- `experiments/bench.py`: a benchmark of real emails. It picks a seeded mix (whole threads, outbound, forwards, group
+  mail, attachments, what the old rules or an agent skipped), has Opus and Sonnet write an answer key independently
+  and Opus settle where they differ, replays the emails into a new vault, and grades it: verdicts, links, people
+  across the set (missing, duplicated, the owner as a person), tasks and facts by a judge. `bench.py review` lets the
+  review fix a copy of a run, to grade it again.
+
+### Changed
+
+- The import prompt is a third denser, and says what the benchmark found missing: every From, To and Cc address in
+  `log_interaction`, however long the list (a class or a family on one email are people the owner knows); the
+  owner's other accounts linked as Me with an address review, never as a person; names resolved with their
+  organization; people named without an address recorded when the email says who they are; no field set on a guess
+  (a relationship, an employer); nothing secret (passwords, card and ID numbers, health details); independent calls
+  in one turn; tasks for questions put to the owner and for what the owner waits on; the answer to an application
+  of the owner's, even a platform's template, recorded; tests the owner sent skipped.
+
+## [0.6.0] - 2026-10-23
+
+Quality checked while the run is still open, and no rules that decide in the agent's place.
+
+### Added
+
+- An import is checked before it counts, from the run's own tool calls: the interaction logged, every address,
+  person, organization and topic orbit listed as unknown taken up or explained, sift asked to index, no failed orbit
+  call dropped without a word. What is left goes back to the agent in the same session, up to twice; the report lists
+  what each time sent back and what was still left (`followups`, `checks_left`), the transcript glean's messages.
+- The run's message says what the email's headers and sender say: Microsoft's spam and bulk ratings, mailing-list and
+  `Auto-Submitted` headers, a no-reply sender, and whether the owner wrote to the sender before, as evidence for the
+  agent to weigh.
+
+### Changed
+
+- glean skips nothing by itself: of 1,798 emails its header rules skipped in a real mailbox, a support desk's replies
+  and an invitation Microsoft rated spam were people's. The agent judges every email now; automated mail costs a run
+  without a tool call, about $0.002 with Haiku. Mail the old rules skipped, and no agent ran on, is new again after
+  the upgrade, and every email gets its document, spam too. Replayed on 56 emails the rules had skipped: 52 skipped
+  by the agent, and 4 imported that people wrote (two support replies, a recruiter's invitation Microsoft sent to
+  junk, a CTO's message through a no-reply address), for $0.14.
+- `skip_senders` is yours alone: glean adds no senders of its own.
+
+### Removed
+
+- `skip_spam` and `skip_bulk`: glean names them when they are still in `glean.toml`, to be removed.
+
+## [0.5.1] - 2026-10-23
+
+What 600 real emails imported oldest first showed.
+
+### Fixed
+
+- An email without a subject: the agent wrote `"subject": ,` for the front matter's `null`, which Claude Code refused
+  as JSON, 8 times, 7 of them in one run. It leaves out what the front matter has as null now.
+- Mailboxes of an office (`zurich@shop.example`) became people named after them; they are the organization's now,
+  and a person's name is one the email gives, an address's handle only for a personal address no one is named for.
+- The agent asked whether an email sent twice, or again with changes, was the same interaction as the first, "so
+  that one can be deleted", which no answer can do; it no longer asks.
+
+Replayed with Haiku on the 12 emails behind these: no call refused for its JSON, the mailboxes linked as their
+organizations, and no review.
+
+## [0.5.0] - 2026-10-23
+
+orbit grows as the mailbox did: oldest first, batch after batch.
+
+### Added
+
+- `run --oldest N` and `list --oldest N`: the N oldest emails not yet imported. Imported in that order, the people
+  and tasks an earlier email creates exist when a later one mentions, answers or settles them. With `--latest N`,
+  which takes the newest, the next batch went further back in time: a reply came before the email it answers, and a
+  task it had settled was opened afterwards, and stayed open.
+
+### Changed
+
+- `list` without `--oldest` or `--latest` shows the 20 oldest emails waiting, as `run --oldest 20` takes them, no
+  longer the 20 newest; `list --status` lists oldest first unless `--latest` is given. The setup's next steps, the
+  README and the error of a `run` without a count suggest `--oldest`. `run` still needs a count or ids, so that no
+  mailbox of thousands starts by accident.
+
+## [0.4.1] - 2026-10-23
+
+### Changed
+
+- Haiku is the default model, no longer Sonnet. In runs of 100 real emails each, Haiku cost $0.27 and Sonnet $4.08;
+  Sonnet 5.5 also called tools without their `mcp__orbit__` prefix, or by names that don't exist, 17 times in 10
+  runs, each a wasted turn. A `glean.toml` written before keeps the model it names: set `[agent] model = "haiku"`.
+
+### Fixed
+
+- The `glean.toml` that setup writes said related items always go one after the other; since 0.3.2 they do so only
+  while other items can run.
+
+## [0.4.0] - 2026-10-23
+
+Downloads and runs are kept apart, so that the imports can start afresh without downloading anything again.
+
+### Changed
+
+- A home holds `mails/` and `mails.db` (what the downloads brought: originals, documents, attachments, every email,
+  where it was found, where the downloads left off, what the skip rules and you decided) and `runs/` and `runs.db`
+  (what the agent's runs made of each email: outcomes, attempts, cost, reports, transcripts). Deleting `runs.db` and
+  `runs/` makes every email as it was downloaded again. Each source's archive has its database beside it, named
+  after it.
+- The mail archive and its sift collection are `mails` by default, no longer `mail`.
+- Reports and transcripts are in `runs/mails/<the email's folder>/`, no longer in a `.glean/` folder beside the email.
+  Where a sift collection holds the whole home, glean's `.siftignore` leaves `runs/` out.
+- `reset` makes an email new whatever its runs made of it, and keeps the number of its runs, so that its next run
+  knows it is a retry; `ignore` takes precedence over what the runs made of an email.
+
+### Removed
+
+- A home of glean 0.3 or older, with everything in one `state.db`, isn't read: glean says so. Start a new home and
+  download again.
+
+## [0.3.2] - 2026-10-23
+
+What a run of 100 real emails with `--parallel 8` showed.
+
+### Changed
+
+- `--parallel N` keeps N agents busy as long as emails wait. Related emails, which share people, a company or a
+  thread, still go one after the other while unrelated ones can run meanwhile, but no longer leave agents idle: in
+  that run, all 8 ran until the 73rd email, then fewer and fewer, down to one, as the last emails were nearly all from
+  one school. Replayed with that run's durations, the schedule now takes a third of the time (2.1 minutes, not 6.6).
+- The agent is told the owner's addresses, `[mail] address` and `my_addresses`: wherever one appears, that is Me in
+  orbit, and one orbit doesn't know yet is added to Me. In a vault made without `orbit init --email`, agents had
+  linked the owner by address or by name, which orbit refused.
+
+### Fixed
+
+- Five automated emails were imported "as asked": the user message began "Import this email", which the agent took
+  for the owner's wish. It now asks for the decision first, and only its line about an email included on purpose
+  overrides the rules for automated mail. Replayed with Haiku on those five and on three of the owner's own, in a
+  vault whose `Me.md` had no address: the five skipped, the three imported, the owner's address added to Me and
+  Me linked, with no call refused.
+- The user message named the email's original `.eml`, of no use to an agent without file tools; one agent passed it
+  to sift's `reindex`, which refuses files its `.siftignore` leaves out. The message gives the original's sha256
+  alone.
+- The README asks for sift 1.3.1, as 1.3.0's server skipped every attachment the agent gave its `reindex`.
+
+## [0.3.1] - 2026-10-23
+
+### Changed
+
+- The agent logs an email with the organizations it concerns, as orbit 0.3 takes them: those orbit knows are linked
+  at once, the others come back as unknown, to be resolved and created with the email as their source, organizations
+  before the people who work there. Replayed on 15 real emails against the prompt of 0.3.0: the same organizations
+  and links, a third fewer `link_entities` calls, at the same cost.
+
+## [0.3.0] - 2026-10-23
+
+For orbit 0.3 and sift 1.3.
+
+### Changed
+
+- glean finds orbit's vault in its resource `orbit://vault`, no longer in the words of its instructions.
+- Needs orbit 0.3 and sift 1.3 or newer. With sift 1.3, the `sift index` after each download reads scanned
+  attachments with OCR, once each.
+
+## [0.2.0] - 2026-10-22
+
+What the first imports of real mail showed: spam and mass mail that got through, runs on automated mail, sift's
+collections to set up by hand, and one run at a time.
+
+### Added
+
+- Spam and mass mail are skipped by Outlook.com's own ratings (SCL, BCL, the junk folder), without an agent run; what
+  people the owner wrote to send is never skipped, and mail skipped before its sender turned out to be one is let in
+  again. Senders that are machines (`*noreply*`, `alerts@`, …) are skipped too.
+- Each run ends with a structured answer: imported, already imported, skipped (automated mail) or spam, with a reason.
+  Mail the agent judges automated or spam is skipped, with that reason, instead of done.
+- Runs side by side: `[agent] parallel` and `run --parallel N`. Emails that share people, a company or a thread still
+  go one after the other, oldest first.
+- glean keeps sift's collections in line: it adds one for its archive and one for orbit's vault (which it asks orbit
+  for) when none holds them, keeps the original `.eml` files out with a `.siftignore`, and has sift index each
+  download. `glean doctor` shows which collections hold what.
+- Every downloaded email but spam gets its Markdown document at once, so sift can search all mail.
+- `experiments/replay.py` replays downloaded mail into a new vault and scores the result.
+
+### Changed
+
+- The prompts follow orbit 0.2: the email's addresses in `log_interaction`, all links in one call, the thread from
+  its answer, tasks that continue the thread's. The agent decides first whether an email is worth recording, logs the
+  interaction before anything else and makes it the source of every write, keeps facts about the owner on Me, and no
+  longer asks whether two interactions are one.
+- orbit's `/mcp/write` endpoint, without merges, renames and lint, is the default `[orbit] url`.
+- Lists in `glean.toml` (`exclude_folders`, `skip_senders`) add to glean's own instead of replacing them, so new
+  defaults reach existing setups; the setup writes only what you must say.
+- Mail downloaded by an older glean follows this version's skip rules and gets its documents, once, before the next
+  download, run or list. The state database gains its new tables by itself.
+- Needs orbit 0.2, sift 1.2 and Claude Code 2.1.290 or newer.
+
+### Fixed
+
+- Headers written as raw 8-bit text, such as an unencoded `Würth` in `To:`, are read as UTF-8 (or Windows-1252)
+  instead of breaking the email's document.
+
+## [0.1.0] - 2026-10-22
+
+The first release.
+
+### Added
+
+- Importing items into orbit and sift, one sandboxed Claude Code agent run per item, oldest first: `glean <source>
+  download`, `list`, `run` (with `--retry-failed`, `--include-skipped` and `--dry-run`), `show`, `ignore` and
+  `reset`, and `glean setup`, `status` and `doctor`.
+- The mail source: IMAP with OAuth2 for Outlook.com and Hotmail (read-only, every folder but junk, trash and drafts),
+  or a folder of `.eml` files; emails as Markdown with their headers as front matter, attachments sift can read saved
+  beside them; newsletters and notifications skipped without an agent run.
+- The agent's sandbox, checked on every run: orbit's reading and writing tools and sift's search and reindex, nothing
+  else; the user's settings, `CLAUDE.md`, hooks, plugins and other servers left out.
+- A setup wizard on first use, and `experiments/` to try imports on a made-up mailbox and a new vault.
+- Python 3.11 to 3.15, on Windows, macOS and Linux.

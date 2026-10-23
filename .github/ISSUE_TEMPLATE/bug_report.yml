@@ -1,0 +1,42 @@
+name: Bug report
+description: Something doesn't work as expected
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead. Leave out private mail content.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: The commands you ran, and the source involved (for mail, the provider and the folder).
+      placeholder: |
+        glean mail download
+        glean mail run --latest 1
+    validations:
+      required: true
+  - type: textarea
+    id: output
+    attributes:
+      label: Output
+      description: The full output of the failing command, or the report of the agent run (`glean mail show <id>`).
+      render: text
+  - type: input
+    id: version
+    attributes:
+      label: glean version
+      description: Output of `glean --version`, and of `claude --version`.
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: Operating system, Python version, and how you installed glean (uv, pip).
+      placeholder: Windows 11, Python 3.12, uv tool install
+    validations:
+      required: true
