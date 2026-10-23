@@ -420,6 +420,16 @@ def test_download_keeps_sift_in_line(mail_home, capsys, monkeypatch, tmp_path):
     assert fake.calls[-1] == ["index", "mails"]
 
 
+def test_a_run_has_sift_index_the_archive_first_which_an_interrupted_download_may_not_have(
+    mail_home, capsys, monkeypatch, tmp_path
+):
+    run(capsys, "mail", "download")  # no sift on PATH: as if the download had stopped before indexing
+    fake = FakeSift([{"name": "mails", "path": str(mail_home / "mails")}])
+    monkeypatch.setattr(cli.sift.Sift, "find", classmethod(lambda cls: cli.sift.Sift(["sift"], fake)))
+    assert run(capsys, "mail", "run", "--latest", "1", "--no-review")[0] == 0
+    assert ["index", "mails"] in fake.calls
+
+
 def test_a_run_tells_the_agent_the_collections_that_hold_its_files(mail_home, capsys, monkeypatch, tmp_path):
     log = tmp_path / "claude.log"
     monkeypatch.setenv("FAKE_CLAUDE", json.dumps({"mode": "ok", "log": str(log)}))

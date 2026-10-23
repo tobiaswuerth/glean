@@ -142,7 +142,9 @@ imported twice is still one interaction. A retry tells the agent so, and it comp
   and can be stopped and started again at any time. A message the server leaves out of its answer is asked for again
   by the next download. `--oldest N` (or `--latest N`) takes only the N oldest (newest) new messages of all folders,
   by when the server got them; a copy in another folder comes along without counting. A folder with messages left
-  keeps its cursor, so the next download takes them.
+  keeps its cursor, so the next download takes them. A notice the server sends in place of a message it can't
+  convert (Exchange's "Retrieval using the IMAP4 protocol failed for the following message") is kept as failed, with
+  that reason, and never imported.
 - **Sign-in** is OAuth2 with [MSAL](https://github.com/AzureAD/microsoft-authentication-library-for-python), in
   glean's own process: the browser opens Microsoft's page, MSAL takes the answer on a local port. See
   [microsoft-app.md](microsoft-app.md).
@@ -266,14 +268,14 @@ returns their answer.
 ## sift's collections
 
 The agent's `reindex` only takes files inside sift's collections. After a download and before a run, glean makes sure
-there is one for the archive and one for orbit's vault, through the `sift` command: it uses a collection that holds
-the folder already (sift refuses one inside another, which would index files twice), or adds one (`sift add …
---title-from name`). orbit names its vault's folder in the resource `orbit://vault`, which glean reads as an MCP client
-would. glean writes the `.siftignore` of the archive's collection where the collection's folder is glean's (its home
-or the archive). After a download it has sift index the archive's collection, which makes every new email findable by
-keyword search, and has sift read the scans among the saved attachments with OCR (half a minute a page on a fast GPU,
-once); the server embeds what the agent reindexes, and `sift embed` the rest. `[sift] add_collections = false` leaves
-sift to you.
+there is one for the archive and one for orbit's vault, through the `sift` command: it uses a collection that holds the
+folder already (sift refuses one inside another, which would index files twice), or adds one (`sift add … --title-from
+name`). orbit names its vault's folder in the resource `orbit://vault`, which glean reads as an MCP client would. glean
+writes the `.siftignore` of the archive's collection where the collection's folder is glean's (its home or the archive).
+After a download, and before a run, it has sift index the archive's collection (a download stopped early hasn't), which
+makes every new email findable by keyword search, and has sift read the scans among the saved attachments with OCR (half
+a minute a page on a fast GPU, once); the server embeds what the agent reindexes, and `sift embed` the rest. `[sift]
+add_collections = false` leaves sift to you.
 
 ## Adding a source
 

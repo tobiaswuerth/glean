@@ -366,6 +366,25 @@ def test_a_message_that_cannot_be_read_is_kept_as_failed(tmp_path, state, monkey
     assert mail.download(state).new == 0  # not fetched again
 
 
+NOTICE = (  # what Exchange and Outlook.com send over IMAP in place of a message they can't convert
+    b'MIME-Version: 1.0\r\nContent-Type: text/plain; charset="us-ascii"\r\nFrom: "Microsoft Exchange Server"\r\n'
+    b"To: tobias@example.com\r\nSubject: Retrieval using the IMAP4 protocol failed for the following message: 7\r\n"
+    b"\r\nThe server couldn't retrieve the following message:\r\n\r\nSubject: Offerte\r\n"
+)
+
+
+def test_a_notice_the_server_sent_in_place_of_a_message_is_kept_as_failed(tmp_path, state, monkeypatch):
+    server = FakeImap({"Inbox": {"validity": 1, "messages": {7: NOTICE, 8: samples.plain()}}})
+    mail, _ = connector(tmp_path)
+    monkeypatch.setattr(mail, "mailbox", lambda: imap.Imap("h", 993, "tobias@example.com", lambda: "T", server))
+    assert mail.download(state).new == 2
+    (notice,) = state.items("mail", "failed")
+    assert notice.reason == "the mail server sent a notice in its place: it couldn't convert the message for IMAP"
+    assert notice.title == "Retrieval using the IMAP4 protocol failed for the following message: 7"
+    assert notice.document is None
+    assert state.find("mail", "caf1234@mail.acme.example").status == "new"
+
+
 def test_the_setup_guide_links_the_instructions_online():
     assert "https://github.com/tobiaswuerth/glean/blob/main/docs/microsoft-app.md" in GUIDE
 

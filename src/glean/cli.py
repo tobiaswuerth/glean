@@ -238,7 +238,8 @@ def run_command(connector, args, state):
             console.say(f"no {connector.noun}s waiting; `glean {connector.name} download` fetches new ones")
             return 0
         runner = None if args.dry_run else agent.Agent(args.config)
-        names = None if args.dry_run else sift.keep(args.config, connector)
+        # indexed again: a download stopped before its end leaves what it stored unsearchable
+        names = None if args.dry_run else sift.keep(args.config, connector, index=True)
         counts = pipeline.run(
             args.config, connector, state, runner, items, out=console.show,
             dry_run=args.dry_run, names=names, parallel=args.parallel or args.config.agent.parallel,

@@ -267,7 +267,8 @@ class Mail(Connector):
         stop every later download."""
         digest = hashlib.sha256(raw).hexdigest()
         try:
-            parsed, broken = message.parse(raw), None
+            parsed = message.parse(raw)
+            broken = message.stand_in(parsed)
         except Exception as e:  # a bug of the email package, met by a malformed message
             parsed, broken = None, f"it couldn't be read: {type(e).__name__}: {e}"
         key = parsed.message_id if parsed else f"{digest[:32]}@glean.invalid"
@@ -286,7 +287,7 @@ class Mail(Connector):
             state.add_contacts(self.name, self._recipients(parsed))
             contacts |= set(self._recipients(parsed))
         contact = bool(parsed) and any(a.email in contacts for a in parsed.from_)
-        why = skip.reason(parsed, outbound, contact, self.config.skip_senders) if parsed else broken
+        why = broken or skip.reason(parsed, outbound, contact, self.config.skip_senders)
         item = Item(
             source=self.name,
             key=key,
@@ -298,12 +299,12 @@ class Mail(Connector):
             path=archive.relative(self.archive, original),
             sha256=digest,
             size=len(raw),
-            status="failed" if not parsed else "skipped" if why else "new",
+            status="failed" if broken else "skipped" if why else "new",
             reason=why,
             id=item_id,
         )
         stored = state.add(item, folder, ref)
-        if parsed:
+        if not broken:
             stored = self._write_document(state, stored, parsed)
         return stored
 

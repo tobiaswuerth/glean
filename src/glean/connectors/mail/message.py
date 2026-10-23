@@ -25,6 +25,9 @@ FILTER_HEADERS = (  # what says a mail is bulk, automated or spam: list headers,
     "x-microsoft-antispam",
     "x-microsoft-antispam-mailbox-delivery",
 )
+STAND_INS = (  # how a notice a server sends over IMAP in place of a message it can't convert begins
+    "Retrieval using the IMAP4 protocol failed for the following message",  # Exchange, Outlook.com
+)
 
 
 @dataclass(frozen=True)
@@ -84,6 +87,13 @@ def normalize_id(value):
 def parse(raw):
     msg = email.message_from_bytes(raw, policy=email.policy.default)
     return _message(msg, hashlib.sha256(raw).hexdigest())
+
+
+def stand_in(parsed):
+    """Why this isn't the message the mailbox holds but a notice its server sent in its place, or None."""
+    if not parsed.has_message_id and parsed.subject.startswith(STAND_INS):
+        return "the mail server sent a notice in its place: it couldn't convert the message for IMAP"
+    return None
 
 
 def _message(msg, digest):

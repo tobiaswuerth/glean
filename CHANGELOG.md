@@ -10,6 +10,13 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - `glean mail download --oldest N` (or `--latest N`) downloads only the N oldest (newest) new emails of all folders;
   the next download takes those left, and the result line says how many are.
 
+### Fixed
+
+- A run has sift index the archive's collection before it starts: a download stopped before its end left what it had
+  stored unsearchable, so the agents found no earlier mail of a thread or a person.
+- A notice Exchange or Outlook.com sends over IMAP in place of a message it can't convert ("Retrieval using the IMAP4
+  protocol failed for the following message") is kept as failed with that reason, instead of imported as an email.
+
 ## [0.9.0] - 2026-10-23
 
 People at their organization, tasks that later mail settles, answers that aren't asked again, a log per run.
