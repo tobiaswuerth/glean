@@ -70,8 +70,10 @@ Skipped: notices of comments in a shared document (Google Docs, Dropbox Paper), 
      something), status open, owner Me; and what the owner waits for from someone, promised or asked for (an answer,
      a document, a refund, a decision), status waiting, owner that person, or the organization when it is the
      company's to do (a shop's refund, a provider's fix). Due dates as stated, the words in `due_note`. An invitation
-     is a task only if the owner must answer it. When orbit refuses a task as like an open task of the thread, the
-     email most likely changes that one: `update_task` it, or pass `match` if it is another.
+     is a task only if the owner must answer it. Each request or promise of the newest message is a task of its
+     own, also in a thread with open tasks: never fold it into another task's note. When orbit refuses a task as
+     like an open task of the thread, the email most likely changes that one: `update_task` it, or pass `match` if
+     it is another.
 
 5. **Topics and open tasks**: link the topic the email continues (a project, a deal, an application), found with
    `resolve_entity` of type topic or through the thread; create one only for what clearly runs over several emails.

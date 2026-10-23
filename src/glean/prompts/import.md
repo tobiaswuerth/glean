@@ -45,7 +45,10 @@ wrote it, record it.
   that an older {noun} can't overwrite a newer fact.
 - **The owner is "Me"**: never create a person for the owner. What will still matter about the owner in a year goes
   on Me as an observation: an application, an offer and the answer, a decision, a commitment, a change in work or
-  life; not the questions they asked, nor what they bought.
+  life, where they study or work (a school and class, an employer), the services they hold (an insurance, a hosting
+  plan, a bank); not the questions they asked, nor what they bought.
+- **As of the {noun}'s date**: record what it says as it stood then, however long ago (a task, an appointment, a
+  question to answer). The vault is the record of what happened; whether something is past is not yours to judge.
 - **Nothing secret**: passwords, codes, card and account numbers, ID document numbers and health details stay out of
   orbit, even when the {noun} states them.
 - **Several calls at once**: calls that don't need each other's answers (resolving several names, reading several

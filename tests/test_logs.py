@@ -34,17 +34,12 @@ def test_two_in_one_second_get_two_files(tmp_path):
     assert (first.name, second.name) == ("mail-run-2026-10-23_210509.log", "mail-run-2026-10-23_210509-2.log")
 
 
-def test_only_the_newest_of_a_kind_are_kept(tmp_path, monkeypatch):
-    monkeypatch.setattr(logs, "KEEP", 2)
+def test_every_log_is_kept(tmp_path):
     folder = tmp_path / "logs"
     folder.mkdir()
-    for day in (1, 2, 3):
-        (folder / f"mail-run-2026-10-0{day}_120000.log").write_text("x", encoding="utf-8")
-    (folder / "mail-download-2026-10-01_120000.log").write_text("x", encoding="utf-8")
+    older = [f"mail-run-2026-10-0{day}_120000.log" for day in range(1, 10)]
+    for name in older:
+        (folder / name).write_text("x", encoding="utf-8")
     with logs.kept(tmp_path, "mail-run", NOW):
         pass
-    assert sorted(p.name for p in folder.iterdir()) == [
-        "mail-download-2026-10-01_120000.log",
-        "mail-run-2026-10-03_120000.log",
-        "mail-run-2026-10-23_210509.log",
-    ]
+    assert sorted(p.name for p in folder.iterdir()) == [*older, "mail-run-2026-10-23_210509.log"]

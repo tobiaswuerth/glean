@@ -217,8 +217,7 @@ returns, one call for all links, people at the organization of their address, ta
 an email settles).
 
 Each `glean mail download`, `run` and `review` keeps what glean said, results included, with the time of each line, in
-a log of its own: `logs/mail-run-2026-10-23_210509.log` in glean's home, and how it ended if it failed. The newest 100
-of each kind are kept.
+a log of its own: `logs/mail-run-2026-10-23_210509.log` in glean's home, and how it ended if it failed. Every log is kept.
 
 ### Several at once
 
