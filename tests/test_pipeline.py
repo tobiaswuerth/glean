@@ -93,14 +93,20 @@ def test_the_system_prompt_never_asks_whether_two_interactions_are_one(setup):
     assert "even one sent twice, or again with changes: never ask whether two interactions are the same" in prompt
 
 
-def test_the_system_prompt_imports_automated_mail_that_settles_a_fact_about_the_owner(setup):
-    # Registrations, admissions and services held came only as confirmations, which were all skipped.
+def test_the_system_prompt_imports_what_people_wrote_and_automated_mail_that_settles_a_fact_about_the_owner(setup):
+    # Registrations, admissions and services held came only as confirmations, which were all skipped; so were a
+    # company's answer to the owner's contact form and a teacher's room change for a class, as passing.
     cfg, notes, _ = setup
     prompt = " ".join(pipeline.system_prompt(cfg, notes).split())
+    assert "what a person wrote to people, however short or passing" in prompt
     assert "a company's answer to the owner's own request" in prompt
-    assert "what a person wrote to people, however short or passing" in prompt  # not skipped as passing logistics
     assert "an automated note that settles a lasting fact about the owner" in prompt
-    assert "These facts go on Me only" in prompt
+
+
+def test_the_system_prompt_keeps_facts_about_the_owner_on_me_alone(setup):
+    # Runs copied the owner's grades and registrations onto the organization that reported them, too.
+    cfg, notes, _ = setup
+    assert "These facts go on Me only" in " ".join(pipeline.system_prompt(cfg, notes).split())
 
 
 def test_the_message_names_the_files_and_fences_the_item(setup):
