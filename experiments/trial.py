@@ -48,9 +48,9 @@ def serving(root, vault, orbit, port, sift_port):
     are never touched."""
     env = os.environ | {"ORBIT_HOME": str(root / "orbit-home"), "SIFT_HOME": str(root / "sift-home"),
                         "GLEAN_HOME": str(root / "home")}  # fmt: skip
-    sift = shutil.which("sift") or sys.exit("sift isn't on PATH")
     for taken in (p for p in (port, sift_port) if listening(p)):  # else that server answers, not ours
         raise SystemExit(f"port {taken} is in use: stop what serves it, or give another port")
+    sift = shutil.which("sift") or sys.exit("sift isn't on PATH")
     started = []
     try:
         for cmd, at, name in (([orbit, "serve", str(vault), "--port", str(port)], port, "orbit"),
