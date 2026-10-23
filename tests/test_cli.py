@@ -104,9 +104,12 @@ def test_the_whole_flow(mail_home, capsys):
     assert status["sources"]["mail"]["cost_usd"] == pytest.approx(0.24)
 
 
-def test_a_download_of_some_says_how_many_are_left(mail_home, capsys):
+def test_a_download_takes_one_count_above_zero(mail_home, capsys):
     assert run(capsys, "mail", "download", "--oldest", "0")[0] == 2
     assert run(capsys, "mail", "download", "--oldest", "1", "--latest", "1")[0] == 2
+
+
+def test_a_download_of_some_says_how_many_are_left(mail_home, capsys):
     code, out, _ = run(capsys, "mail", "download", "--latest", "3")
     assert code == 0
     assert out.startswith("3 new emails")
