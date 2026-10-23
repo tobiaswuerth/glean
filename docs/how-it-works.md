@@ -2,7 +2,7 @@
 
 ```
 glean <source> download    the source's new items → its archive (originals and documents) and the archive's
-                           database; then sift indexes them
+                           database; then sift indexes them. --oldest N / --latest N: only that many
 glean <source> list        the items not yet imported, oldest first
 glean <source> run         oldest first, several at a time where they share no people or thread:
                              1. document   the connector writes the item's Markdown, and files sift can read
@@ -102,9 +102,9 @@ brought:
 
 | Table | Holds |
 |---|---|
-| `items` | one row per item: key (an email's Message-ID), id, date, title, author, direction, the original's path and sha256, the document's path, and what the download, your `skip_senders` or you decided: `new`, `skipped` (with the pattern), `failed` (unreadable) or `ignored` |
+| `items` | one row per item: key (an email's Message-ID), id, date, title, author, direction, the original's path and sha256, the document's path, and what the download, your `skip_senders` or you decided: `new`, `skipped` (with the pattern), `failed` (unreadable, or a server's notice in its place) or `ignored` |
 | `locations` | every place an item was found: an email in Inbox and Archive is one item in two places |
-| `cursors` | where the last download of each folder ended: for IMAP, its UIDVALIDITY and last UID |
+| `cursors` | how far each folder is downloaded, where the next download starts: for IMAP, its UIDVALIDITY and last UID |
 | `contacts` | the addresses the owner has written to |
 | `marks` | what glean keeps for the source, such as the version its items were brought in line with |
 
@@ -140,7 +140,11 @@ imported twice is still one interaction. A retry tells the agent so, and it comp
   read except those the server marks as junk, trash or drafts and those in `exclude_folders`. A download fetches the
   Message-IDs of new messages first, so a copy of a known email isn't downloaded twice, then the messages in batches,
   and can be stopped and started again at any time. A message the server leaves out of its answer is asked for again
-  by the next download.
+  by the next download. `--oldest N` (or `--latest N`) takes only the N oldest (newest) new messages of all folders,
+  by when the server got them; a copy in another folder comes along without counting. A folder with messages left
+  keeps its cursor, so the next download takes them. A notice the server sends in place of a message it can't
+  convert (Exchange's "Retrieval using the IMAP4 protocol failed for the following message") is kept as failed, with
+  that reason, so that runs leave it out.
 - **Sign-in** is OAuth2 with [MSAL](https://github.com/AzureAD/microsoft-authentication-library-for-python), in
   glean's own process: the browser opens Microsoft's page, MSAL takes the answer on a local port. See
   [microsoft-app.md](microsoft-app.md).
@@ -161,9 +165,11 @@ evidence to weigh:
   and the like (role addresses people answer from, `support@`, `info@`, are not among them);
 - that the owner has written to the sender before (the recipients of the owner's mail).
 
-What the owner wrote gets none. Automated mail costs a run of two turns (one is the answer), no tool calls, about
-$0.002 with Haiku. Only the senders in `skip_senders` are skipped without a run, and never what the owner wrote or
-what people they wrote to send; mail skipped before its sender turned out to be such a person is let back in.
+What the owner wrote gets none. Automated mail costs a run of two turns (one is the answer), no tool calls, about $0.002
+with Haiku; one that settles a lasting fact about the owner (a registration or admission, a service or contract that
+starts, changes or ends) is imported as its interaction, its organization and the fact on Me. Only the senders in
+`skip_senders` are skipped without a run, and never what the owner wrote or what people they wrote to send; mail skipped
+before its sender turned out to be such a person is let back in.
 
 ## The agent run
 
@@ -264,14 +270,14 @@ returns their answer.
 ## sift's collections
 
 The agent's `reindex` only takes files inside sift's collections. After a download and before a run, glean makes sure
-there is one for the archive and one for orbit's vault, through the `sift` command: it uses a collection that holds
-the folder already (sift refuses one inside another, which would index files twice), or adds one (`sift add …
---title-from name`). orbit names its vault's folder in the resource `orbit://vault`, which glean reads as an MCP client
-would. glean writes the `.siftignore` of the archive's collection where the collection's folder is glean's (its home
-or the archive). After a download it has sift index the archive's collection, which makes every new email findable by
-keyword search, and has sift read the scans among the saved attachments with OCR (half a minute a page on a fast GPU,
-once); the server embeds what the agent reindexes, and `sift embed` the rest. `[sift] add_collections = false` leaves
-sift to you.
+there is one for the archive and one for orbit's vault, through the `sift` command: it uses a collection that holds the
+folder already (sift refuses one inside another, which would index files twice), or adds one (`sift add … --title-from
+name`). orbit names its vault's folder in the resource `orbit://vault`, which glean reads as an MCP client would. glean
+writes the `.siftignore` of the archive's collection where the collection's folder is glean's (its home or the archive).
+After a download, and before a run, it has sift index the archive's collection (a download stopped early hasn't), which
+makes every new email findable by keyword search, and has sift read the scans among the saved attachments with OCR (half
+a minute a page on a fast GPU, once); the server embeds what the agent reindexes, and `sift embed` the rest. `[sift]
+add_collections = false` leaves sift to you.
 
 ## Adding a source
 
@@ -282,7 +288,7 @@ A source is a `Connector` (`glean/connectors/base.py`) registered in `glean/conn
 | `name`, `noun`, `help` | its command group and table in `glean.toml` (`mail`), what an item is called (`email`), one line of help |
 | `configure(table)` | reads its table of `glean.toml`; the result has `archive` and `collection` |
 | `setup(ask, say)` | asks what its table needs, for `glean setup`; returns the table |
-| `download(state)` | stores what is new in the archive and its database, without changing the source |
+| `download(state, oldest, latest)` | stores what is new in the archive and its database, or only the N oldest or newest of it, without changing the source |
 | `document(item)` | writes the item's Markdown and the files sift should index; returns a `Document`, with `related`: what the item shares with others it mustn't be imported beside |
 | `instructions()` | the source's part of the agent's prompt |
 | `commands`, `ignored`, `check()`, `key()`, `upgrade()`, `after_setup()` | optional: commands of its own (`login`), files sift should leave out, checks for `glean doctor`, how a person writes a key, bringing an older glean's items in line, a step after setup |

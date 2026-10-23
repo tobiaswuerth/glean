@@ -12,6 +12,7 @@ class FakeImap:
         self.folders, self.uid_last, self.refuse_auth, self.refuse = folders, uid_last, refuse_auth, set(refuse)
         self.commands, self.selected, self.untagged, self.auth = [], None, {}, None
         self.no_uid, self.no_body = set(), set()  # responses glean can't place; messages the server leaves out
+        self.undated = set()  # messages whose INTERNALDATE the server leaves out
 
     def __call__(self, host, port, timeout=None):  # stands in for imaplib.IMAP4_SSL
         self.address = (host, port, timeout)
@@ -78,7 +79,8 @@ class FakeImap:
                 data += [(b"%d (BODY[] {%d}" % (n, len(raw)), raw), b")"]
             elif "HEADER.FIELDS" in items:
                 header = b"".join(re.findall(rb"(?im)^message-id:.*\r?\n", raw)) + b"\r\n"
-                meta = b'%d (UID %d RFC822.SIZE %d INTERNALDATE " 4-Oct-2026 09:32:00 +0200" ' % (n, uid, len(raw))
+                meta = b"%d (UID %d RFC822.SIZE %d " % (n, uid, len(raw))
+                meta += b"" if uid in self.undated else b'INTERNALDATE " 4-Oct-2026 09:32:00 +0200" '
                 data += [(meta + b"BODY[HEADER.FIELDS (MESSAGE-ID)] {%d}" % len(header), header), b")"]
             elif self.uid_last:
                 data += [(b"%d (BODY[] {%d}" % (n, len(raw)), raw), b" UID %d)" % uid]

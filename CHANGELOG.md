@@ -5,6 +5,34 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-10-24
+
+Download only some, facts about the owner from automated mail, an index that is current for every run.
+
+### Added
+
+- `glean mail download --oldest N` (or `--latest N`) downloads only the N oldest (newest) new emails of all folders;
+  the next download takes those left, and the result line says how many are. A download says how many folders it
+  looks through before it scans them, which takes a while in a large mailbox.
+
+### Changed
+
+- The import prompt imports automated mail that settles a lasting fact about the owner (a registration or admission, a
+  service or contract that starts, changes or ends) as the interaction, its organization and the fact on Me, and a
+  company's answer to the owner's own request; facts about the owner go on Me only; a person's mail is imported however
+  short or passing. A copy of an email updates its task; every open task the email settles is closed. The owner's own
+  addresses are logged too.
+- The review renames a note spelled as its address spells the name once an email shows how the person writes it,
+  searches Me and sift before asking the owner, and leaves imported automated mail that settles a fact about the owner.
+
+### Fixed
+
+- A run has sift index the archive's collection before it starts: a download stopped before its end left what it had
+  stored unsearchable, so the agents found no earlier mail of a thread or a person.
+- A notice Exchange or Outlook.com sends over IMAP in place of a message it can't convert ("Retrieval using the IMAP4
+  protocol failed for the following message") is kept as failed with that reason, which runs leave out, not as a new
+  email.
+
 ## [0.9.0] - 2026-10-23
 
 People at their organization, tasks that later mail settles, answers that aren't asked again, a log per run.

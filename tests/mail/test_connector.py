@@ -2,6 +2,7 @@
 
 import datetime
 import hashlib
+import os
 from types import SimpleNamespace
 
 import pytest
@@ -68,6 +69,7 @@ def test_download_from_an_eml_folder(tmp_path, state):
     report = mail.download(state)
     assert (report.new, report.skipped, report.known) == (3, 0, 1)
     assert report.places == {"Inbox": 2, "Sent": 1}
+    assert said[0] == "looking for new emails in 2 folders"  # scanning a large mailbox takes a while
     assert any("downloading 2 emails" in s for s in said)
     hans = state.find("mail", "caf1234@mail.acme.example")
     assert hans.containers == ("Inbox", "Sent")
@@ -105,6 +107,74 @@ def test_download_over_imap_reads_only_and_continues_where_it_stopped(tmp_path, 
     report = mail.download(state)
     assert (report.new, report.known) == (1, 0)
     assert state.cursor("mail", "Inbox") == "1:3"
+
+
+def dated_eml_folder(tmp_path):
+    """Five emails, day1 to day5, each arrived a day after the one before; the odd days in Inbox, the even in Sent."""
+    root = tmp_path / "eml"
+    (root / "Sent").mkdir(parents=True)
+    for day in range(1, 6):
+        path = (root if day % 2 else root / "Sent") / f"{day}.eml"
+        path.write_bytes(samples.plain(message_id=f"<day{day}@x>"))
+        stamp = datetime.datetime(2026, 10, day, tzinfo=datetime.UTC).timestamp()
+        os.utime(path, (stamp, stamp))
+
+
+def downloaded(state):
+    return [d for d in range(1, 6) if state.find("mail", f"day{d}@x")]
+
+
+def test_a_download_of_the_oldest_n_takes_them_across_folders_and_the_next_continues(tmp_path, state):
+    dated_eml_folder(tmp_path)
+    mail, said = connector(tmp_path, eml=True)
+    report = mail.download(state, oldest=2)
+    assert (report.new, report.waiting) == (2, 3)
+    assert downloaded(state) == [1, 2]
+    assert "Inbox: downloading 1 email" in said
+    report = mail.download(state, oldest=2)
+    assert (report.new, report.waiting) == (2, 1)
+    assert downloaded(state) == [1, 2, 3, 4]
+    report = mail.download(state)
+    assert (report.new, report.waiting) == (1, 0)
+
+
+def test_a_download_of_the_latest_n_takes_the_newest(tmp_path, state):
+    dated_eml_folder(tmp_path)
+    mail, _ = connector(tmp_path, eml=True)
+    report = mail.download(state, latest=3)
+    assert (report.new, report.waiting) == (3, 2)
+    assert downloaded(state) == [3, 4, 5]
+
+
+def test_a_limited_download_over_imap_keeps_the_cursor_of_a_folder_with_mail_left(tmp_path, state, monkeypatch):
+    first, second, third = (samples.plain(message_id=f"<day{d}@x>") for d in (1, 2, 3))
+    server = FakeImap(
+        {
+            "Inbox": {"validity": 1, "messages": {1: first, 2: second, 3: third}},
+            "Sent": {"flags": "\\Sent", "validity": 1, "messages": {9: first}},
+        }
+    )
+    mail, _ = connector(tmp_path)
+    monkeypatch.setattr(mail, "mailbox", lambda: imap.Imap("h", 993, "tobias@example.com", lambda: "T", server))
+    report = mail.download(state, oldest=2)
+    assert (report.new, report.known, report.waiting) == (2, 1, 1)  # Sent's copy of the first doesn't count
+    assert state.find("mail", "day1@x").containers == ("Inbox", "Sent")
+    assert (state.cursor("mail", "Inbox"), state.cursor("mail", "Sent")) == (None, "1:9")
+    report = mail.download(state, oldest=2)
+    assert (report.new, report.known, report.waiting) == (1, 0, 0)
+    assert state.cursor("mail", "Inbox") == "1:3"
+
+
+def test_a_message_of_unknown_date_comes_after_the_dated_ones_either_way(tmp_path, monkeypatch):
+    server = FakeImap({"Inbox": {"validity": 1, "messages": {1: samples.plain(message_id="<undated@x>"),
+                                                             2: samples.plain(message_id="<dated@x>")}}})  # fmt: skip
+    server.undated.add(1)
+    mail, _ = connector(tmp_path)
+    monkeypatch.setattr(mail, "mailbox", lambda: imap.Imap("h", 993, "tobias@example.com", lambda: "T", server))
+    for which, home in (("oldest", tmp_path / "a"), ("latest", tmp_path / "b")):
+        with State(home, {"mail": home / "archive"}, now=lambda: NOW) as state:
+            mail.download(state, **{which: 1})
+            assert (state.find("mail", "dated@x") is None, state.find("mail", "undated@x") is None) == (False, True)
 
 
 def test_a_message_found_again_after_a_new_uidvalidity_is_known(tmp_path, state, monkeypatch):
@@ -169,6 +239,18 @@ def test_the_instructions_give_an_offices_mailbox_to_its_organization(tmp_path):
     assert "Not people: role addresses (info@, support@, …), a mailbox named after a place, a team or an office" in (
         " ".join(mail.instructions().split())
     )
+
+
+def test_the_instructions_log_the_owners_address_too(tmp_path):
+    # Agents left the owner's own address out of log_interaction, and were sent back for it.
+    mail, _ = connector(tmp_path)
+    assert "every address of the front matter, the owner's too" in " ".join(mail.instructions().split())
+
+
+def test_the_instructions_close_what_an_email_settles_and_reuse_a_copys_task(tmp_path):
+    # Tasks a later reply settled stayed open for years, and a notice sent twice made two tasks.
+    text = " ".join(connector(tmp_path)[0].instructions().split())
+    assert "or is a copy of the email that made it" in text
 
 
 def test_the_instructions_name_the_owners_addresses(tmp_path):
@@ -307,6 +389,25 @@ def test_a_message_that_cannot_be_read_is_kept_as_failed(tmp_path, state, monkey
     assert (mail.archive / poisoned.path).read_bytes() == b"Message-ID: <poison@x>\r\n\r\nPOISON\r\n"
     assert poisoned.title == "(unreadable)"
     assert mail.download(state).new == 0  # not fetched again
+
+
+NOTICE = (  # what Exchange and Outlook.com send over IMAP in place of a message they can't convert
+    b'MIME-Version: 1.0\r\nContent-Type: text/plain; charset="us-ascii"\r\nFrom: "Microsoft Exchange Server"\r\n'
+    b"To: tobias@example.com\r\nSubject: Retrieval using the IMAP4 protocol failed for the following message: 7\r\n"
+    b"\r\nThe server couldn't retrieve the following message:\r\n\r\nSubject: Offerte\r\n"
+)
+
+
+def test_a_notice_the_server_sent_in_place_of_a_message_is_kept_as_failed(tmp_path, state, monkeypatch):
+    server = FakeImap({"Inbox": {"validity": 1, "messages": {7: NOTICE, 8: samples.plain()}}})
+    mail, _ = connector(tmp_path)
+    monkeypatch.setattr(mail, "mailbox", lambda: imap.Imap("h", 993, "tobias@example.com", lambda: "T", server))
+    assert mail.download(state).new == 2
+    (notice,) = state.items("mail", "failed")
+    assert notice.reason == "the mail server sent a notice in its place: it couldn't convert the message for IMAP"
+    assert notice.title == "Retrieval using the IMAP4 protocol failed for the following message: 7"
+    assert notice.document is None
+    assert state.find("mail", "caf1234@mail.acme.example").status == "new"
 
 
 def test_the_setup_guide_links_the_instructions_online():

@@ -48,6 +48,10 @@ def parser():
 def _shared(sub, name, connector):
     nouns = f"{connector.noun}s"
     download = sub.add_parser("download", help=f"download new {nouns}; the source is never changed")
+    some = download.add_mutually_exclusive_group()
+    some.add_argument("--oldest", type=_positive, metavar="N", help=f"only the N oldest new {nouns}; the next download "
+                      "takes those left")  # fmt: skip
+    some.add_argument("--latest", type=_positive, metavar="N", help=f"only the N newest new {nouns}")
     download.set_defaults(run=lambda args: with_connector(args, download_command))
 
     def choosing(c, default):
@@ -171,12 +175,13 @@ def logged(command):
 def download_command(connector, args, state):
     with pipeline.lock(connector.home):
         connector.upgrade(state)
-        found = connector.download(state)
+        found = connector.download(state, args.oldest, args.latest)
         sift.keep(args.config, connector, index=True)
     places = ", ".join(f"{n:,} in {p}" for p, n in found.places.items())
     console.show(
         f"{console.count(found.new, f'new {connector.noun}')}" + (f" ({places})" if places else "")
         + f", {found.skipped:,} of them skipped by your skip_senders; {found.known:,} known already"
+        + (f"; {found.waiting:,} more to download" if found.waiting else "")
     )  # fmt: skip
     return 0
 
@@ -233,7 +238,8 @@ def run_command(connector, args, state):
             console.say(f"no {connector.noun}s waiting; `glean {connector.name} download` fetches new ones")
             return 0
         runner = None if args.dry_run else agent.Agent(args.config)
-        names = None if args.dry_run else sift.keep(args.config, connector)
+        # indexed again: a download stopped before its end leaves what it stored unsearchable
+        names = None if args.dry_run else sift.keep(args.config, connector, index=True)
         counts = pipeline.run(
             args.config, connector, state, runner, items, out=console.show,
             dry_run=args.dry_run, names=names, parallel=args.parallel or args.config.agent.parallel,

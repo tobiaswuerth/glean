@@ -34,6 +34,7 @@ class Downloaded:
     new: int = 0  # items stored for the first time
     skipped: int = 0  # of those, how many the owner's skip_senders set aside
     known: int = 0  # items seen before, possibly in another place
+    waiting: int = 0  # items left in the source, beyond the number asked for
     places: dict[str, int] = field(default_factory=dict)  # new items per container
 
 
@@ -91,9 +92,10 @@ class Connector(ABC):
         return []
 
     @abstractmethod
-    def download(self, state):
-        """Store every item the source holds that the state database doesn't know yet, in the archive and the state
-        database, and return what it found as Downloaded. Never changes the source."""
+    def download(self, state, oldest=None, latest=None):
+        """Store every item the source holds that the state database doesn't know yet, or only the `oldest` or the
+        `latest` N of them, in the archive and the state database, and return what it found as Downloaded. The next
+        download takes those left. Never changes the source."""
 
     @abstractmethod
     def document(self, item):

@@ -47,6 +47,16 @@ def setup(tmp_path):
         yield cfg, notes, state
 
 
+def test_a_source_downloads_only_the_oldest_or_newest_it_is_asked_for(tmp_path):
+    # Every connector takes download's count; the smallest one shows how.
+    notes = Notes(Notes.configure(config.Table({}, "notes", tmp_path / "glean.toml")), tmp_path)
+    notes.source = {k: (f"2026-10-0{n}T09:00:00+02:00", k, k) for n, k in enumerate("cab", 1)}
+    with State(tmp_path, {"notes": notes.archive}, now=lambda: NOW) as state:
+        assert (notes.download(state, oldest=1).new, [i.key for i in state.items("notes")]) == (1, ["c"])
+        assert (notes.download(state, latest=1).waiting, [i.key for i in state.items("notes")]) == (1, ["b", "c"])
+        assert (notes.download(state).new, notes.download(state).known) == (1, 3)
+
+
 def test_choose_the_oldest_first(setup):
     # The CRM grows as the mailbox did: people and tasks first, then what follows from them.
     _, notes, state = setup
@@ -91,6 +101,22 @@ def test_the_system_prompt_never_asks_whether_two_interactions_are_one(setup):
     cfg, notes, _ = setup
     prompt = " ".join(pipeline.system_prompt(cfg, notes).split())
     assert "even one sent twice, or again with changes: never ask whether two interactions are the same" in prompt
+
+
+def test_the_system_prompt_imports_what_people_wrote_and_automated_mail_that_settles_a_fact_about_the_owner(setup):
+    # Registrations, admissions and services held came only as confirmations, which were all skipped; so were a
+    # company's answer to the owner's contact form and a teacher's room change for a class, as passing.
+    cfg, notes, _ = setup
+    prompt = " ".join(pipeline.system_prompt(cfg, notes).split())
+    assert "what a person wrote to people, however short or passing" in prompt
+    assert "a company's answer to the owner's own request" in prompt
+    assert "an automated note that settles a lasting fact about the owner" in prompt
+
+
+def test_the_system_prompt_keeps_facts_about_the_owner_on_me_alone(setup):
+    # Runs copied the owner's grades and registrations onto the organization that reported them, too.
+    cfg, notes, _ = setup
+    assert "These facts go on Me only" in " ".join(pipeline.system_prompt(cfg, notes).split())
 
 
 def test_the_message_names_the_files_and_fences_the_item(setup):

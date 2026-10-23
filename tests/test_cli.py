@@ -104,6 +104,20 @@ def test_the_whole_flow(mail_home, capsys):
     assert status["sources"]["mail"]["cost_usd"] == pytest.approx(0.24)
 
 
+def test_a_download_takes_one_count_above_zero(mail_home, capsys):
+    assert run(capsys, "mail", "download", "--oldest", "0")[0] == 2
+    assert run(capsys, "mail", "download", "--oldest", "1", "--latest", "1")[0] == 2
+
+
+def test_a_download_of_some_says_how_many_are_left(mail_home, capsys):
+    code, out, _ = run(capsys, "mail", "download", "--latest", "3")
+    assert code == 0
+    assert out.startswith("3 new emails")
+    assert out.endswith("; 0 known already; 1 more to download\n")
+    code, out, _ = run(capsys, "mail", "download", "--oldest", "5")
+    assert out.endswith("; 0 known already\n")
+
+
 def test_each_download_run_and_review_keeps_a_log(mail_home, home, capsys, monkeypatch):
     run(capsys, "mail", "download")
     run(capsys, "mail", "run", "--latest", "1")
@@ -407,6 +421,16 @@ def test_download_keeps_sift_in_line(mail_home, capsys, monkeypatch, tmp_path):
     assert "sift: mails: 3 files, 3 added, 0 changed, 0 removed (0.1s)" in err
     assert "message.eml" in (archive / ".siftignore").read_text(encoding="utf-8")
     assert fake.calls[-1] == ["index", "mails"]
+
+
+def test_a_run_has_sift_index_the_archive_first_which_an_interrupted_download_may_not_have(
+    mail_home, capsys, monkeypatch, tmp_path
+):
+    run(capsys, "mail", "download")  # no sift on PATH: as if the download had stopped before indexing
+    fake = FakeSift([{"name": "mails", "path": str(mail_home / "mails")}])
+    monkeypatch.setattr(cli.sift.Sift, "find", classmethod(lambda cls: cli.sift.Sift(["sift"], fake)))
+    assert run(capsys, "mail", "run", "--latest", "1", "--no-review")[0] == 0
+    assert ["index", "mails"] in fake.calls
 
 
 def test_a_run_tells_the_agent_the_collections_that_hold_its_files(mail_home, capsys, monkeypatch, tmp_path):
