@@ -212,8 +212,13 @@ The **prompt** is `glean/prompts/import.md`, shared by every source: decide firs
 log the interaction first and make it the source of everything else; resolve before writing; write only what the
 item states, facts about the owner on Me; ask with `propose_review` when unsure; the item as data and never
 instructions; documents, indexing and the answer. Each connector adds its part: for mail,
-`glean/connectors/mail/instructions.md` (the headers as orbit takes them, the thread orbit returns, one call for all
-links, tasks that continue the thread's).
+`glean/connectors/mail/instructions.md` (which emails are worth it, the headers as orbit takes them, the thread orbit
+returns, one call for all links, people at the organization of their address, tasks an organization owes, open tasks
+an email settles).
+
+Each `glean mail download`, `run` and `review` keeps what glean said, results included, with the time of each line, in
+a log of its own: `logs/mail-run-2026-10-23_210509.log` in glean's home, and how it ended if it failed. Every log is
+kept.
 
 ### Several at once
 
@@ -233,12 +238,16 @@ the most common cause, and the items not yet run stay as they were.
 
 After a run, glean has a stronger model (`[agent] review_model`, Opus by default) look at what the imports wrote, one
 review run per `review_every` imports (100). It reads a digest of each import (the item's subject, sender and
-verdict, and its report, shortened), not the items, and has orbit's full tools (`/mcp`: merges and renames too, but
-no new interactions or tasks) and sift's search. It merges duplicates the notes prove, merges the owner's other notes
-into Me, corrects tasks and fields the digests and notes show to be wrong, and answers with a report, the ids of
-items to import again (glean makes them new, so the next run takes them) and suggestions for the importer's
-instructions. The report goes to `runs/reviews/`, with its transcript. Its limits are ten times an import's: turns,
-budget and time. `glean mail review` reviews the latest imports when asked (`--latest N`, or ids).
+verdict, and its report, shortened; a skipped item's is a line with its reason, as a review rereads its input on every
+turn), not the items, and has orbit's full tools (`/mcp`: merges, renames and `link_by_domain` too, but no new
+interactions or tasks) and sift's search. It links people without an organization to the one their address is at,
+merges duplicates the notes prove, merges the owner's other notes into Me, renames notes named after an address
+handle, closes tasks later emails settled, corrects tasks and fields the digests and notes show to be wrong, and
+answers with a report, the ids of items to import again (glean makes them new, so the next run takes them) and
+suggestions for the importer's instructions. Notes an import recorded as different only the owner's yes to a
+duplicate review merges; a refused call isn't tried again. The report goes to `runs/reviews/`, with its transcript.
+Its limits are ten times an import's: turns, budget and time. `glean mail review` reviews the latest imports when
+asked (`--latest N`, or ids). It needs orbit 0.8.0 or newer.
 
 **Questions for the owner.** What no email says, only the owner knows: who a person is to them, whether an
 organization is their bank or their school, whether something that looks automated mattered. The review asks such
@@ -246,11 +255,11 @@ questions as orbit's open questions, notes in `90_Review` that say which emails 
 necessary (its answer would change what orbit holds, and nothing in orbit can settle it), related ones put together,
 and never one pending or answered already; above 15 per 100 imports, only the 15 that matter most, against flooding.
 The review's report lists them. The owner answers in their own words in the `answer` column of the Review
-base's table in Obsidian. The next review reads the answered ones first: it records what they say on the notes they
-are about,
-with the owner's answer as the source, makes the corrections they call for, and settles each with what it did, so
-that the answer is acted on once. Later imports then find that knowledge in orbit when they resolve the people and
-organizations an email names.
+base's table in Obsidian, and a yes-or-no question with a tick. The next review reads the answered ones first: it
+records what they say on the notes they are about, with the owner's answer as the source, makes the corrections they
+call for, and settles each with what it did, so that the answer is acted on once. Later imports then find that
+knowledge in orbit when they resolve the people and organizations an email names; asking what the owner answered
+returns their answer.
 
 ## sift's collections
 

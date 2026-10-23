@@ -26,6 +26,7 @@ ALLOWED = [
 OTHERS = [
     "mcp__orbit__merge_entities",
     "mcp__orbit__rename_entity",
+    "mcp__orbit__link_by_domain",
     "mcp__orbit__lint_vault",
     "mcp__orbit__settle_review",
     "mcp__sift__vsearch",

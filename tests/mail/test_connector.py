@@ -164,9 +164,9 @@ def test_the_instructions_leave_out_what_the_email_lacks(tmp_path):
 
 
 def test_the_instructions_give_an_offices_mailbox_to_its_organization(tmp_path):
-    # zurich@shop.example became a person named after the branch's town.
+    # A shop's branch mailbox became a person named after the branch's town.
     mail, _ = connector(tmp_path)
-    assert "nor is a mailbox named after a place, a team or an office (zurich@shop.example, kundendienst@…)" in (
+    assert "Not people: role addresses (info@, support@, …), a mailbox named after a place, a team or an office" in (
         " ".join(mail.instructions().split())
     )
 

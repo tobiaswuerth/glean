@@ -1,17 +1,17 @@
 """Replay emails glean downloaded already into a new vault, with the real agent, and score the result: for trying
 prompts and models on real mail with nothing real at stake. Reads the given glean home; writes only into --dir.
 
-    uv run python experiments/replay.py --home D:/glean/data --match "Offerte" "Hans Müller" --model sonnet
-    uv run python experiments/replay.py --home D:/glean/data --sample 20 --seed 1 --status new done
+    uv run python experiments/replay.py --home D:/glean/data --owner you@example.com --model sonnet \
+        --match "Offerte" "Hans Müller"
+    uv run python experiments/replay.py --home D:/glean/data --owner you@example.com --sample 20 --seed 1 \
+        --status new done
 
 The emails are copied into a folder of .eml files (one subfolder per mail folder), glean downloads them from there
-into a home of its own, and imports them into a new orbit vault served on --port. sift is the running one: it is
-searched, but glean adds no collections to it (add_collections = false), so it refuses to index the replay's files.
-The folder is kept; its vault can be opened in Obsidian."""
+into a home of its own, and imports them into a new orbit vault served on --port, with a sift of its own on
+--sift-port that indexes the replay's mail and vault. The folder is kept; its vault can be opened in Obsidian."""
 
 import argparse
 import json
-import os
 import random
 import re
 import shutil
@@ -22,7 +22,7 @@ import tempfile
 from collections import Counter
 from pathlib import Path
 
-from trial import wait_for
+from trial import serving, settings
 
 from glean.state import State
 
@@ -87,9 +87,11 @@ def main():
     p.add_argument("--model", default="sonnet")
     p.add_argument("--parallel", type=int, default=1)
     p.add_argument("--port", type=int, default=8777)
+    p.add_argument("--sift-port", type=int, default=8779, help="the replay's own sift's port")
     p.add_argument("--dir", type=Path, help="where to keep the replay (default: a new temporary folder)")
     p.add_argument("--owner", required=True, help="the account's address")
     p.add_argument("--owner-name", default="Owner", help="the name of the vault's owner, Me")
+    p.add_argument("--my-addresses", nargs="*", default=[], help="the owner's other addresses, Me's and glean's")
     p.add_argument("--bare-me", action="store_true", help="a vault whose Me.md has no name or address")
     p.add_argument("--orbit", help="the orbit command to run (default: the one on PATH)")
     args = p.parse_args()
@@ -105,25 +107,20 @@ def main():
     print(f"replaying {len(items)} emails in {root}")
     orbit = args.orbit or shutil.which("orbit") or sys.exit("orbit isn't on PATH")
     owner = [] if args.bare_me else ["--name", args.owner_name, "--email", args.owner]
+    owner += [arg for address in args.my_addresses if not args.bare_me for arg in ("--email", address)]
     subprocess.run([orbit, "init", str(vault), *owner], check=True, capture_output=True)
     home.mkdir()
     (home / "glean.toml").write_text(
         f'[agent]\nmodel = "{args.model}"\nparallel = {args.parallel}\n\n'
-        f'[orbit]\nurl = "http://127.0.0.1:{args.port}/mcp/write"\n\n[sift]\nadd_collections = false\n\n'
-        f'[mail]\naddress = "{args.owner}"\neml_folder = "{eml.as_posix()}"\n',
+        + settings(args.port, args.sift_port)
+        + f'[mail]\naddress = "{args.owner}"\nmy_addresses = {json.dumps(args.my_addresses)}\n'
+        f'eml_folder = "{eml.as_posix()}"\n',
         encoding="utf-8",
     )
-    env = os.environ | {"ORBIT_HOME": str(root / "orbit-home"), "GLEAN_HOME": str(home)}
-    server = subprocess.Popen([orbit, "serve", str(vault), "--port", str(args.port)], env=env,
-                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)  # fmt: skip
-    try:
-        wait_for(args.port)
+    with serving(root, vault, orbit, args.port, args.sift_port) as env:
         glean = [sys.executable, "-m", "glean"]
         subprocess.run([*glean, "mail", "download"], env=env, check=True)
         subprocess.run([*glean, "mail", "run", "--oldest", str(len(items)), "--no-review"], env=env)  # bench.py reviews
-    finally:
-        server.terminate()
-        server.wait(timeout=10)
     reports = []
     for report in sorted((home / "runs").rglob("report.md")):
         front = report.read_text(encoding="utf-8").split("---\n")[1]

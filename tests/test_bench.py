@@ -1,8 +1,12 @@
 """The benchmark's logic (experiments/bench.py): picking emails, comparing two keys, reading a vault, grading."""
 
+import json
+import socket
 import sys
 from collections import Counter
 from pathlib import Path
+
+import pytest
 
 sys.path.insert(0, str(Path(__file__).parents[1] / "experiments"))
 
@@ -24,6 +28,31 @@ def test_threads_come_whole_and_every_email_once_oldest_first():
     assert len(ids) == len(set(ids))
     assert ids == sorted(ids)
     assert chosen == bench.pick(rows, {"thread": 3, "outbound": 4, "forward": 2, "rule_skipped": 1}, seed=3)
+
+
+def test_cases_come_with_the_earlier_emails_of_their_thread():
+    rows = [row(n, thread="t") for n in range(1, 6)] + [row(6), row(7, thread="t")]
+    chosen = bench.cases(rows, ["e005", "e006", "e003"], context=2)
+    assert [(r["id"], s) for r, s in chosen] == [("e001", "context"), ("e002", "context"), ("e003", "case"),
+                                                 ("e004", "context"), ("e005", "case"), ("e006", "case")]  # fmt: skip
+
+
+def test_cases_name_ids_the_home_has():
+    with pytest.raises(SystemExit, match="no emails with ids nope"):
+        bench.cases([row(1)], ["e001", "nope"])
+
+
+def test_a_replay_refuses_a_port_another_server_holds(tmp_path):
+    # A leftover server on the port answered instead, with another vault, while the new one failed to start.
+    import trial
+
+    with socket.socket() as taken:
+        taken.bind(("127.0.0.1", 0))
+        taken.listen()
+        port = taken.getsockname()[1]
+        with pytest.raises(SystemExit, match=f"port {port} is in use"), trial.serving(tmp_path, tmp_path, "orbit", port,
+                                                                                         port + 1):  # fmt: skip
+            pass
 
 
 def test_short_threads_are_no_thread():
@@ -137,7 +166,7 @@ def test_the_grade_counts_people_across_the_set():
     confusion = Counter({("import", "import"): 1, ("import", "skip"): 1, ("skip", "skip"): 1})
     grade = bench.summary(Counter(), confusion, keys, items, notes)
     assert grade["people"] == {"expected": 2, "notes": 3, "missing": 1, "duplicated": 1, "asked": 0,
-                               "owner_as_person": 1, "unexpected": 1}  # fmt: skip
+                               "owner_as_person": 1, "unexpected": 1, "split": 0, "unlinked": 0}  # fmt: skip
     assert grade["people_duplicated"] == [["Hans Müller", "Hans"]]
     notes[1]["review_status"] = "needs_review"  # created provisional, with a review for the owner
     asked = bench.summary(Counter(), confusion, keys, items, notes)["people"]
@@ -145,3 +174,42 @@ def test_the_grade_counts_people_across_the_set():
     assert grade["verdict_accuracy"] == 0.667
     assert grade["tasks"] == {"recall": None, "precision": None}  # nothing to count: no number
     assert "| verdict_accuracy | 0.667 |" in bench.markdown("x", grade | {"remarks": ["one"]})
+
+
+def test_twins_recorded_as_different_people_count_as_split():
+    items, keys = [{"id": "a"}], {"a": key(people=[{"name": "Hans", "emails": ["h@x.ch"], "role": "from"}])}
+    notes = [{"name": "Hans", "emails": ["h@x.ch"], "distinct_from": ["Hans (2)"]},
+             {"name": "Hans (2)", "emails": ["h@x.ch"], "review_status": "needs_review"}]  # fmt: skip
+    grade = bench.summary(Counter(), Counter({("import", "import"): 1}), keys, items, notes)
+    assert (grade["people"]["asked"], grade["people"]["split"]) == (1, 1)
+
+
+def test_people_without_the_organization_their_address_names():
+    people = [{"name": "Ann", "emails": ["ann@school.example"]},
+              {"name": "Bo", "emails": ["bo@students.school.example"]},
+              {"name": "Cy", "emails": ["cy@school.example"], "org": "School"},
+              {"name": "Di", "emails": ["di@gmail.com"]}, {"name": "Ed", "emails": ["ed@xschool.example"]}]  # fmt: skip
+    assert bench.unlinked(people, [{"name": "School", "domains": ["School.example"]}]) == ["Ann", "Bo"]
+
+
+def test_the_tasks_of_earlier_emails_for_the_judge():
+    notes = {"Old": ({"type": "interaction", "date": "2017-01-02T10:00:00+01:00"}, ""),
+             "New": ({"type": "interaction", "date": "2017-03-01T10:00:00+01:00"}, ""),
+             "Refund": ({"type": "task", "origin": "Old", "status": "waiting", "owner": "Acme AG"}, ""),
+             "Later": ({"type": "task", "origin": "New", "status": "open", "owner": "Me"}, ""),
+             "Loose": ({"type": "task", "status": "open"}, "")}  # fmt: skip
+    assert bench.earlier_tasks(notes, "2017-02-01T00:00:00+01:00") == ["- Refund (waiting, Acme AG)"]
+    assert bench.earlier_tasks(notes, None) == []
+
+
+def test_refused_orbit_calls_of_a_transcript(tmp_path):
+    def call(n, name, error):
+        use = {"type": "tool_use", "id": f"c{n}", "name": name, "input": {}}
+        result = {"type": "tool_result", "tool_use_id": f"c{n}", "is_error": error, "content": "x"}
+        return [{"message": {"content": [use]}}, {"message": {"content": [result]}}]
+
+    events = call(1, "mcp__orbit__create_task", True) + call(2, "mcp__orbit__log_interaction", False)
+    events += call(3, "mcp__sift__reindex", True)
+    (tmp_path / "transcript.jsonl").write_text("\n".join(map(json.dumps, events)), encoding="utf-8")
+    assert bench.refused(tmp_path / "transcript.jsonl") == 1
+    assert bench.refused(tmp_path / "missing.jsonl") == 0

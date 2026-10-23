@@ -104,6 +104,21 @@ def test_the_whole_flow(mail_home, capsys):
     assert status["sources"]["mail"]["cost_usd"] == pytest.approx(0.24)
 
 
+def test_each_download_run_and_review_keeps_a_log(mail_home, home, capsys, monkeypatch):
+    run(capsys, "mail", "download")
+    run(capsys, "mail", "run", "--latest", "1")
+    monkeypatch.setenv("FAKE_CLAUDE", json.dumps({"mode": "offline"}))
+    run(capsys, "mail", "run", "--latest", "1")
+    found = sorted((home / "logs").glob("*.log"))
+    assert [p.name.split("-20")[0] for p in found] == ["mail-download", "mail-run", "mail-run"]
+    assert "INFO 4 new emails (3 in Inbox, 1 in Sent)" in found[0].read_text(encoding="utf-8")
+    runs = " ".join(p.read_text(encoding="utf-8") for p in found[1:])
+    assert "INFO done " in runs  # the item's line, which goes to stdout
+    assert "INFO reviewing 1 import with opus" in runs
+    assert "ERROR GleanError: sift isn't connected" in runs
+    assert "list" not in " ".join(p.name for p in found)  # reading commands keep none
+
+
 def test_a_dry_run(mail_home, capsys):
     run(capsys, "mail", "download")
     code, out, _ = run(capsys, "mail", "run", "--latest", "1", "--dry-run")
@@ -261,7 +276,7 @@ def test_doctor_when_all_is_well(doctor, capsys):
     lines = out.splitlines()
     assert all(line.startswith("ok  ") for line in lines)
     assert any("agent: 18 tools, orbit and sift connected, nothing else" in line for line in lines)
-    assert any("review: 18 tools on orbit's /mcp, merges included" in line for line in lines)
+    assert any("review: 19 tools on orbit's /mcp, merges included" in line for line in lines)
     assert any("mail: reads .eml files from" in line for line in lines)
     assert any("sift: the collection 'data' holds the mail archive" in line for line in lines)
     assert any("sift: the collection 'crm' holds orbit's vault" in line for line in lines)

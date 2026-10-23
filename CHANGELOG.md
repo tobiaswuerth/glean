@@ -5,6 +5,31 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-10-23
+
+People at their organization, tasks that later mail settles, answers that aren't asked again, a log per run.
+
+### Added
+
+- Each `glean mail download`, `run` and `review` writes what it says, results included, with the time of each line,
+  to a log of its own in `logs/` of glean's home, down to how it ended if it failed. Every log is kept.
+- The review links people without an organization to the one their address is at (orbit's `link_by_domain`),
+  renames notes named after an address handle, and closes tasks that a later email settled.
+
+### Changed
+
+- The import prompt, rewritten: the same rules, grouped and shorter. New in it: every sender and recipient who is a
+  person is recorded, a bare address too (named by what the address spells, else its handle); an organization's
+  domain includes its subdomains, and orbit gives a person the organization of their address; an organization may
+  owe a task (a refund, a fix); each request or promise is a task of its own, recorded as of the email's date however
+  long ago; open tasks an email settles are closed; facts come from the email itself, never from later ones sift
+  holds; the owner's affiliations (school, employer, services they hold) go on Me; an email the owner wrote to a
+  person is imported however short; comment notices of shared documents are skipped.
+- An unsure match is provisional with a review, never also recorded as a different person; a refused call isn't
+  repeated unchanged; what the owner answered is never asked again.
+- A review reads a skipped item's digest as one line, with its reason.
+- Needs orbit 0.8.0 or newer, whose tools the review uses.
+
 ## [0.8.1] - 2026-10-23
 
 ### Changed
@@ -244,7 +269,7 @@ collections to set up by hand, and one run at a time.
 
 ### Fixed
 
-- Headers written as raw 8-bit text, such as an unencoded `Würth` in `To:`, are read as UTF-8 (or Windows-1252)
+- Headers written as raw 8-bit text, such as an unencoded `Müller` in `To:`, are read as UTF-8 (or Windows-1252)
   instead of breaking the email's document.
 
 ## [0.1.0] - 2026-10-22

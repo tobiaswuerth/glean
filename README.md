@@ -35,11 +35,13 @@ updates people, organizations and tasks, and makes the item searchable. Neither 
   every unknown person and organization taken up, sift asked to index, no failed call dropped. What is left goes back
   to the agent in the same session, up to twice, and into the report. A batch whose runs keep going wrong stops.
 - **A second look by a stronger model.** After a run, one Opus review per 100 imports reads what they wrote: it merges
-  proven duplicates, corrects misplaced tasks and fields, sends wrongly judged emails back to be imported again, and
-  suggests changes to the instructions (about $1 per 100 emails).
+  proven duplicates, links people to the organization of their address, closes tasks later emails settled, corrects
+  misplaced tasks and fields, sends wrongly judged emails back to be imported again, and suggests changes to the
+  instructions (about $1 per 100 emails).
 - **Questions only you can answer.** The review asks a few (who is this to you? is this your bank?) as notes in
-  orbit's review queue. You type the answer into its column in Obsidian, whenever suits you; the next review records
-  what you said and acts on it, and later imports find it as context.
+  orbit's review queue. You tick Yes or No, or type the answer into its column in Obsidian, whenever suits you; your
+  answer wins, the next review acts on it, later imports find it as context, and nothing you answered is asked again.
+- **A log per run.** Every download, run and review writes what it said, with times, to `logs/` in glean's home.
 - **sift kept in line.** glean adds the sift collections of its archive and of orbit's vault when none holds them,
   keeps the originals out of them, and has sift index every downloaded email.
 - **Local.** The archive, glean's databases and the sign-in tokens stay on your machine; the tokens are encrypted
@@ -56,7 +58,7 @@ updates people, organizations and tasks, and makes the item searchable. Neither 
 - Python 3.11 or newer.
 - [Claude Code](https://claude.com/claude-code) 2.1.290 or newer, signed in (`claude auth status`). On Windows, the
   native installer's `claude.exe`.
-- [orbit](https://github.com/tobiaswuerth/orbit) 0.7.1 or newer and [sift](https://github.com/tobiaswuerth/sift) 1.3.1
+- [orbit](https://github.com/tobiaswuerth/orbit) 0.8.0 or newer and [sift](https://github.com/tobiaswuerth/sift) 1.3.1
   or newer (1.3.0 doesn't index the attachments the agent gives it), each serving MCP over HTTP: `orbit serve <vault>`
   (port 8775) and `sift serve` (port 8765). Give orbit's vault your addresses when you create it, with
   `orbit init <vault> --email you@example.com`.
