@@ -144,7 +144,7 @@ imported twice is still one interaction. A retry tells the agent so, and it comp
   by when the server got them; a copy in another folder comes along without counting. A folder with messages left
   keeps its cursor, so the next download takes them. A notice the server sends in place of a message it can't
   convert (Exchange's "Retrieval using the IMAP4 protocol failed for the following message") is kept as failed, with
-  that reason, and never imported.
+  that reason, so that runs leave it out.
 - **Sign-in** is OAuth2 with [MSAL](https://github.com/AzureAD/microsoft-authentication-library-for-python), in
   glean's own process: the browser opens Microsoft's page, MSAL takes the answer on a local port. See
   [microsoft-app.md](microsoft-app.md).

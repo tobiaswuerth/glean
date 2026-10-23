@@ -26,7 +26,8 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - A run has sift index the archive's collection before it starts: a download stopped before its end left what it had
   stored unsearchable, so the agents found no earlier mail of a thread or a person.
 - A notice Exchange or Outlook.com sends over IMAP in place of a message it can't convert ("Retrieval using the IMAP4
-  protocol failed for the following message") is kept as failed with that reason, instead of imported as an email.
+  protocol failed for the following message") is kept as failed with that reason, which runs leave out, not as a new
+  email.
 
 ## [0.9.0] - 2026-10-23
 
