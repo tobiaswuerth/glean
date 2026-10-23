@@ -150,8 +150,9 @@ class Mail(Connector):
         report = Downloaded()
         contacts = self._contacts(state)
         with self.mailbox() as box:
-            scanned = []
-            for folder in self.chosen(box.folders()):
+            scanned, folders = [], self.chosen(box.folders())
+            self.say(f"looking for new {self.noun}s in {console.count(len(folders), 'folder')}")
+            for folder in folders:
                 headers, cursor = box.scan(folder, state.cursor(self.name, folder.name))
                 scanned.append((folder, self._unknown(state, folder, headers, report), cursor))
             wanted = _first([(f.name, h) for f, todo, _ in scanned for h in todo], oldest or latest, bool(latest))

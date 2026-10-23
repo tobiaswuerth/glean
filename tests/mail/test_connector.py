@@ -69,6 +69,7 @@ def test_download_from_an_eml_folder(tmp_path, state):
     report = mail.download(state)
     assert (report.new, report.skipped, report.known) == (3, 0, 1)
     assert report.places == {"Inbox": 2, "Sent": 1}
+    assert said[0] == "looking for new emails in 2 folders"  # scanning a large mailbox takes a while
     assert any("downloading 2 emails" in s for s in said)
     hans = state.find("mail", "caf1234@mail.acme.example")
     assert hans.containers == ("Inbox", "Sent")
