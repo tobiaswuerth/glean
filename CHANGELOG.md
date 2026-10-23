@@ -22,8 +22,8 @@ Download only some, facts about the owner from automated mail, an index that is 
   company's answer to the owner's own request; facts about the owner go on Me only; a person's mail is imported however
   short or passing. A copy of an email updates its task; every open task the email settles is closed. The owner's own
   addresses are logged too.
-- The review renames a note spelled as its address spells the name once an email shows how the person writes it, and
-  searches Me and sift before asking the owner.
+- The review renames a note spelled as its address spells the name once an email shows how the person writes it,
+  searches Me and sift before asking the owner, and leaves imported automated mail that settles a fact about the owner.
 
 ### Fixed
 

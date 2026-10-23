@@ -27,8 +27,8 @@ Start with `link_by_domain`, once: it links people without an organization to th
 2. **The owner as someone else**: a person note that is the owner under another address or a spelling of their
    name: merge it into Me, or, if unsure, propose a review of kind `address` for Me.
 3. **Wrong verdicts**: a {noun} skipped though its digest shows a person wrote it to people, or one imported that is
-   automated mail: its id under `reimport`. So too an import that recorded clearly wrong things, once you have undone
-   what you can.
+   automated mail and settles no lasting fact about the owner (a registration, a service that starts or ends): its id
+   under `reimport`. So too an import that recorded clearly wrong things, once you have undone what you can.
 4. **Misplaced facts**: a task with the wrong owner or status, an observation or field on the wrong note (a fact about
    the owner belongs on Me), a relation that isn't so, a note named after an address handle, a misspelling or how the
    address spells the name where {noun}s show how the person writes it (hansmueller, Mueller: Hans Müller):
