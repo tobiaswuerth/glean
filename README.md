@@ -139,15 +139,15 @@ a `.siftignore`, since sift reads each email's Markdown document. It finds the v
 ## Use
 
 ```bash
-glean mail download            # fetch what is new; the first time, everything
+glean mail download               # fetch what is new; the first time, everything
 glean mail download --oldest 500  # only the 500 oldest of it; the next download takes the rest
-glean mail list --oldest 20    # the 20 oldest not yet imported, in the order run takes them
-glean mail run --oldest 20     # import them, oldest first, one agent run each, then review what they wrote
-glean mail review --latest 50  # review the 50 latest imports again
-glean mail show <id>           # one email: its state, files, and the agent's report
-glean mail ignore <id>         # never import it
-glean mail reset <id>          # import it again
-glean status                   # counts per source and status, the agents' cost so far
+glean mail list --oldest 20       # the 20 oldest not yet imported, in the order run takes them
+glean mail run --oldest 20        # import them, oldest first, one agent run each, then review what they wrote
+glean mail review --latest 50     # review the 50 latest imports again
+glean mail show <id>              # one email: its state, files, and the agent's report
+glean mail ignore <id>            # never import it
+glean mail reset <id>             # import it again
+glean status                      # counts per source and status, the agents' cost so far
 ```
 
 `run` also takes `--latest N` for the newest instead (still oldest first among them; a later `--oldest` then imports
