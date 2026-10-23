@@ -5,10 +5,15 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-10-24
+
+Download only some, facts about the owner from automated mail, an index that is current for every run.
+
 ### Added
 
 - `glean mail download --oldest N` (or `--latest N`) downloads only the N oldest (newest) new emails of all folders;
-  the next download takes those left, and the result line says how many are.
+  the next download takes those left, and the result line says how many are. A download says how many folders it
+  looks through before it scans them, which takes a while in a large mailbox.
 
 ### Changed
 
