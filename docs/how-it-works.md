@@ -165,9 +165,11 @@ evidence to weigh:
   and the like (role addresses people answer from, `support@`, `info@`, are not among them);
 - that the owner has written to the sender before (the recipients of the owner's mail).
 
-What the owner wrote gets none. Automated mail costs a run of two turns (one is the answer), no tool calls, about
-$0.002 with Haiku. Only the senders in `skip_senders` are skipped without a run, and never what the owner wrote or
-what people they wrote to send; mail skipped before its sender turned out to be such a person is let back in.
+What the owner wrote gets none. Automated mail costs a run of two turns (one is the answer), no tool calls, about $0.002
+with Haiku; one that settles a lasting fact about the owner (a registration or admission, a service or contract that
+starts, changes or ends) is imported as its interaction, its organization and the fact on Me. Only the senders in
+`skip_senders` are skipped without a run, and never what the owner wrote or what people they wrote to send; mail skipped
+before its sender turned out to be such a person is let back in.
 
 ## The agent run
 
