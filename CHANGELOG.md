@@ -10,6 +10,17 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - `glean mail download --oldest N` (or `--latest N`) downloads only the N oldest (newest) new emails of all folders;
   the next download takes those left, and the result line says how many are.
 
+### Changed
+
+- The import prompt imports automated mail that settles a lasting fact about the owner (a registration or admission,
+  a service or contract that starts, changes or ends) as the interaction, its organization and the fact on Me, and a
+  company's answer to the owner's own request; facts about the owner go on Me only. Tasks only for what someone can
+  visibly finish: none for an open-ended promise, a platform's invitation to connect or a notice to a whole list; a
+  copy of an email updates its task; every open task the email or a reply it quotes settles is closed. The owner's
+  own addresses are logged too.
+- The review renames a note spelled as its address spells the name once an email shows how the person writes it, and
+  searches Me and sift before asking the owner.
+
 ### Fixed
 
 - A run has sift index the archive's collection before it starts: a download stopped before its end left what it had

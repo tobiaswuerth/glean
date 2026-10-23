@@ -22,7 +22,8 @@ platform. Skip notices of comments in a shared document (Google Docs, Dropbox Pa
 2. **Log it** with `log_interaction`:
    - `kind` "email"; `date`, `subject`, `direction`, `message_id`, `in_reply_to` and `references` from the front
      matter as they are; leave out those the front matter has as null, such as the subject of an email without one.
-   - `sender`, `to` and `cc`: every address of the front matter, as written, however long the list; `orgs`: the
+   - `sender`, `to` and `cc`: every address of the front matter, the owner's too, as written, however long the list;
+     `orgs`: the
      organizations it concerns, by name. orbit links those it knows and lists the rest under `unknown_addresses` and
      `unknown_orgs`.
    - `source_file`: the Markdown file's path from the user message; `sha256`: the front matter's.
@@ -62,17 +63,20 @@ platform. Skip notices of comments in a shared document (Google Docs, Dropbox Pa
    - **Facts**: `add_observation` for lasting facts about the people, organizations and topics (a role, a move, a
      decision, an event someone invites the owner to), and about the owner on Me; not what is passing (a meeting
      room, a parcel's whereabouts). `set_fields` for a single value that changed (a new job title or phone).
-   - **Tasks**: `create_task` for each request or promise of the newest message, even a short reply's. What the owner
-     promised, was asked or has to do (answer a question, attend an interview or appointment, send or prepare
-     something): status open, owner Me. What the owner waits for (an answer, a document, a refund, a decision):
-     status waiting, owner that person, or the organization when it is the company's to do (a refund, a fix). Due
-     dates as stated, the words in `due_note`. An invitation is a task only if the owner must answer it. Each is a
-     task of its own, also in a thread with open tasks: never fold it into another's note. If orbit refuses one as
-     like an open task of the thread, the email likely changes that one: `update_task` it, or pass `match` if it is
-     another.
+   - **Tasks**: `create_task` for each request or promise of the newest message that someone can visibly finish, even
+     a short reply's. What the owner promised, was asked or has to do (answer a question, attend an interview or
+     appointment, send or prepare something): status open, owner Me. What the owner waits for (an answer, a
+     document, a refund, a decision): status waiting, owner that person, or the organization when it is the
+     company's to do (a refund, a fix). Due dates as stated, the words in `due_note`. No task for an open-ended
+     promise ("we won't pass on your data": an observation), an invitation to connect on a platform, or a notice to a
+     whole class or list; an invitation is a task only if the owner must answer it. Each is a task of its own, also
+     in a thread with open tasks: never fold it into another's note. If orbit refuses one as like an open task of
+     the thread, the email likely changes that one, or is a copy of the email that made it: `update_task` it, or
+     pass `match` if it is another.
 
 5. **Topics and open tasks**: link the topic the email continues (a project, a deal, an application), found with
    `resolve_entity` of type topic or through the thread; create one only for what clearly runs over several emails.
-   `log_interaction` lists the open tasks of the thread and of whom the email is with (`open_tasks`): each one this
-   email settles (the refund came, the files arrived, the question was answered, the case was closed) gets
-   `update_task`, status done or cancelled, with a note.
+   `log_interaction` lists the open tasks of the thread and of whom the email is with (`open_tasks`): every one this
+   email settles, in its newest message or the replies it quotes (the refund came, the files arrived, the question
+   was answered, a thank-you for the answer, the problem was found, the case was closed), gets `update_task`, status
+   done or cancelled, with a note.

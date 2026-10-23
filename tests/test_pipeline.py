@@ -93,6 +93,15 @@ def test_the_system_prompt_never_asks_whether_two_interactions_are_one(setup):
     assert "even one sent twice, or again with changes: never ask whether two interactions are the same" in prompt
 
 
+def test_the_system_prompt_imports_automated_mail_that_settles_a_fact_about_the_owner(setup):
+    # Registrations, admissions and services held came only as confirmations, which were all skipped.
+    cfg, notes, _ = setup
+    prompt = " ".join(pipeline.system_prompt(cfg, notes).split())
+    assert "a company's answer to the owner's own request" in prompt
+    assert "an automated note that settles a lasting fact about the owner" in prompt
+    assert "These facts go on Me only" in prompt
+
+
 def test_the_message_names_the_files_and_fences_the_item(setup):
     _, notes, state = setup
     item = state.find("notes", "a")

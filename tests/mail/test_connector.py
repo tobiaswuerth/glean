@@ -228,6 +228,21 @@ def test_the_instructions_give_an_offices_mailbox_to_its_organization(tmp_path):
     )
 
 
+def test_the_instructions_log_the_owners_address_too(tmp_path):
+    # Agents left the owner's own address out of log_interaction, and were sent back for it.
+    mail, _ = connector(tmp_path)
+    assert "every address of the front matter, the owner's too" in " ".join(mail.instructions().split())
+
+
+def test_the_instructions_make_tasks_only_of_what_someone_can_finish(tmp_path):
+    # Open-ended promises, platform invitations and class broadcasts left tasks open for years; so did copies.
+    text = " ".join(connector(tmp_path)[0].instructions().split())
+    assert "each request or promise of the newest message that someone can visibly finish" in text
+    assert "No task for an open-ended promise" in text
+    assert "or is a copy of the email that made it" in text
+    assert "every one this email settles, in its newest message or the replies it quotes" in text
+
+
 def test_the_instructions_name_the_owners_addresses(tmp_path):
     # Agents linked the owner by address, or by a name of their own, which orbit's Me.md may not have.
     mail, _ = connector(tmp_path, 'my_addresses = ["Tobias.Privat@mail.example"]\n')

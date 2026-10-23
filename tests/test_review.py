@@ -114,6 +114,14 @@ def test_a_batch_asks_what_is_necessary_under_a_ceiling_against_flooding():
     assert "more than 15 seem necessary, ask the 15 that matter most" in prompt
     assert "more than 2 seem necessary" in " ".join(review.system_prompt(notes, 10, "2026-10-23").split())
     assert "the owner's answer, 2026-10-23" in prompt
+    assert "no email or note can settle: search Me's note and sift first" in prompt  # one asked what a mail told
+
+
+def test_a_review_renames_a_note_to_how_the_person_writes_their_name():
+    # Names spelled from an address ("Mueller") stayed after a later email showed the person's own ("Müller").
+    notes = type("Connector", (), {"noun": "email"})()
+    prompt = " ".join(review.system_prompt(notes, 100, "2026-10-23").split())
+    assert "how the address spells the name where emails show how the person writes it" in prompt
 
 
 def test_a_batch_is_reviewed_review_every_at_a_time(batch):
