@@ -264,8 +264,8 @@ class Mail(Connector):
     def _store(self, state, folder, ref, raw, received, contacts):
         """Store one downloaded message: its original in the archive, its item in the state database, and its
         document unless it is spam. None if the state database knows it already (found in another folder, or before
-        its folder's UIDVALIDITY changed). A message that can't be read is kept too, as failed, so that it doesn't
-        stop every later download."""
+        its folder's UIDVALIDITY changed). A message that can't be read, or the notice a server sent in its place, is
+        kept too, as failed, so that it doesn't stop every later download and no run takes it."""
         digest = hashlib.sha256(raw).hexdigest()
         try:
             parsed = message.parse(raw)
