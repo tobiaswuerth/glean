@@ -10,7 +10,7 @@ import urllib.error
 import urllib.request
 from datetime import datetime
 
-from . import __version__, agent, archive, config, console, pipeline, review, settings, sift, wizard
+from . import __version__, agent, archive, config, console, logs, pipeline, review, settings, sift, wizard
 from .connectors import CONNECTORS
 from .errors import GleanError
 from .state import STATUSES, State
@@ -156,13 +156,25 @@ def setup_command(args):
     return 0
 
 
+def logged(command):
+    """A source's command that keeps its own log (see logs)."""
+
+    def run(connector, args, state):
+        name = f"{connector.name}-{command.__name__.removesuffix('_command')}"
+        with logs.kept(args.config.home, name, datetime.now()):
+            return command(connector, args, state)
+
+    return run
+
+
+@logged
 def download_command(connector, args, state):
     with pipeline.lock(connector.home):
         connector.upgrade(state)
         found = connector.download(state)
         sift.keep(args.config, connector, index=True)
     places = ", ".join(f"{n:,} in {p}" for p, n in found.places.items())
-    print(
+    console.show(
         f"{console.count(found.new, f'new {connector.noun}')}" + (f" ({places})" if places else "")
         + f", {found.skipped:,} of them skipped by your skip_senders; {found.known:,} known already"
     )  # fmt: skip
@@ -209,6 +221,7 @@ def _which(args):
     return (args.oldest if args.oldest is not None else args.default_count), False
 
 
+@logged
 def run_command(connector, args, state):
     count, newest = _which(args)
     if not args.ids and count is None:
@@ -222,7 +235,7 @@ def run_command(connector, args, state):
         runner = None if args.dry_run else agent.Agent(args.config)
         names = None if args.dry_run else sift.keep(args.config, connector)
         counts = pipeline.run(
-            args.config, connector, state, runner, items, out=lambda line: print(line, flush=True),
+            args.config, connector, state, runner, items, out=console.show,
             dry_run=args.dry_run, names=names, parallel=args.parallel or args.config.agent.parallel,
         )  # fmt: skip
         if counts:
@@ -232,6 +245,7 @@ def run_command(connector, args, state):
     return 1 if counts.get("failed") else 0
 
 
+@logged
 def review_command(connector, args, state):
     count = args.latest or args.config.agent.review_every or 100
     with pipeline.lock(connector.home):

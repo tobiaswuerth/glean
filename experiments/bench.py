@@ -3,13 +3,17 @@ organizations, tasks and facts, and the duplicates it makes. Opus and Sonnet wri
 settles where they differ, and only what it can't settle is the owner's to answer.
 
     uv run python experiments/bench.py select --home D:/glean/data --owner-name "Your Name" --bench D:/bench/set-1
+    uv run python experiments/bench.py select --home D:/glean/data --owner-name "Your Name" --bench D:/bench/set-2 \
+        --ids 0123456789ab 456789abcdef
     uv run python experiments/bench.py annotate --bench D:/bench/set-1 --parallel 8
     uv run python experiments/bench.py run --bench D:/bench/set-1 --name haiku-0.7 --model haiku
     uv run python experiments/bench.py grade --bench D:/bench/set-1 --name haiku-0.7
     uv run python experiments/bench.py review --bench D:/bench/set-1 --name haiku-0.7
 
 The emails are personal: --bench must be outside every repository (glean's home is). `select` picks a seeded mix of
-kinds (whole threads, outbound, forwards, group mail, attachments, what the old rules or the agent skipped, imports);
+kinds (whole threads, outbound, forwards, group mail, attachments, what the old rules or the agent skipped, imports),
+or with --ids the failure cases a run showed, each after the earlier emails of its thread, replayed with all the
+owner's addresses;
 `annotate` writes keys/opus, keys/sonnet and key/ (one JSON per email) and disputes.md; `run` replays the emails
 oldest first into a new vault with the real agent (replay.py), without the review; `grade` compares that vault with
 the key and writes grades/<name>.json and .md; `review` copies a run to <name>+review and lets glean's review fix the
@@ -17,7 +21,6 @@ copy, to grade it too. A key's `owner_context`, what only the owner knows, isn't
 
 import argparse
 import json
-import os
 import random
 import re
 import shutil
@@ -25,13 +28,15 @@ import sqlite3
 import subprocess
 import sys
 import tempfile
+import tomllib
 import unicodedata
 from collections import Counter, defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-from trial import wait_for
+from trial import serving, settings
 
+from glean import checks
 from glean.agent import find_claude
 from glean.connectors.mail import message as mail_message
 
@@ -109,17 +114,11 @@ SETTLED = {
     "properties": {**KEY["properties"], "dispute": OPTIONAL_TEXT},
     "required": [*KEY["required"], "dispute"],
 }
+FOUND = ("tasks_found", "tasks_sound", "owner_facts_found", "facts_found", "observations_sound", "settled_found")
 JUDGED = {
     "type": "object",
-    "properties": {
-        "tasks_found": {"type": "integer"},
-        "tasks_sound": {"type": "integer"},
-        "owner_facts_found": {"type": "integer"},
-        "facts_found": {"type": "integer"},
-        "observations_sound": {"type": "integer"},
-        "remarks": {"type": "string"},
-    },
-    "required": ["tasks_found", "tasks_sound", "owner_facts_found", "facts_found", "observations_sound", "remarks"],
+    "properties": {**{name: {"type": "integer"} for name in FOUND}, "remarks": {"type": "string"}},
+    "required": [*FOUND, "remarks"],
 }
 SPEC = """\
 The importer records the owner's email in a personal CRM: people, organizations, the email as an interaction,
@@ -128,8 +127,9 @@ tasks, and facts. Your key says what a careful human assistant would record from
 - verdict: "import" when a person wrote it to people (also a reply from a support desk's person, a recruiter's
   message through a platform, an invitation someone sent). "skip" for automated mail: newsletters, marketing,
   notifications, alerts, receipts, invoices, order and shipping notices, sign-in and security notices, confirmations
-  a system sent, automatic replies. "spam" for unsolicited scams, phishing, mail that pretends to know the owner.
-  The headers' signals (spam ratings, List-Unsubscribe, no-reply senders) are hints; the text decides.
+  a system sent, automatic replies, notices of comments in shared documents (the conversation lives there). "spam"
+  for unsolicited scams, phishing, mail that pretends to know the owner. The headers' signals (spam ratings,
+  List-Unsubscribe, no-reply senders) are hints; the text decides.
 - owner_addresses: addresses in the email that are the owner's own (the owner is {owner}); others that carry the
   owner's name and act as the owner (a school or work account forwarding to them) count too, relatives don't.
 - people (for import only; never the owner): who wrote it (from), its recipients (to, cc) and the people its newest
@@ -161,8 +161,9 @@ You grade an importer that recorded an email in a personal CRM, against an answe
 wording: tasks_found, the key's tasks the importer recorded; tasks_sound, the importer's tasks that the email
 supports as commitments (the key's or not); owner_facts_found and facts_found, the key's facts the importer recorded,
 as observations or as fields of the people and organizations it linked (a job title, an address); observations_sound,
-the importer's observations the email supports and worth keeping. remarks: one or two lines on what it got wrong, if
-anything."""
+the importer's observations the email supports and worth keeping; settled_found, the key's settled tasks (earlier
+tasks this email settles) that the vault's earlier tasks show as done. remarks: one or two lines on what it got wrong,
+if anything."""
 ROLES = ("from", "to", "cc", "mentioned", "orgs")  # an interaction's links to people and organizations
 SHOWN = ("name", "type", "emails", "phones", "org", "job_title", "department", "location", "address", "website",
          "former_orgs", "reports_to", "colleague_of", "introduced_by")  # fields the judge sees  # fmt: skip
@@ -243,16 +244,39 @@ def pick(rows, quotas=QUOTAS, seed=1):
     return sorted(chosen, key=lambda pair: pair[0]["date"])
 
 
+def cases(rows, ids, context=3):
+    """The emails with these ids, as [(row, "case")], with up to `context` earlier emails of each one's thread
+    ("context"), oldest first."""
+    if unknown := sorted(set(ids) - {r["id"] for r in rows}):
+        raise SystemExit(f"the home has no emails with ids {', '.join(unknown)}: pass ids from its mails.db")
+    wanted = [r for r in rows if r["id"] in set(ids)]
+    chosen = {r["id"]: (r, "case") for r in wanted}
+    for case in wanted:
+        earlier = [r for r in rows if r["thread"] == case["thread"] and r["date"] < case["date"]]
+        for r in earlier[-context:] if context else []:
+            chosen.setdefault(r["id"], (r, "context"))
+    return sorted(chosen.values(), key=lambda pair: pair[0]["date"])
+
+
 def select(args):
     home, bench = args.home.resolve(), args.bench.resolve()
     if (bench / "items.json").exists():
         raise SystemExit(f"{bench} has a selection already: give a new --bench")
-    chosen = pick(survey(home), seed=args.seed)
+    rows = survey(home)
+    chosen = cases(rows, args.ids, args.context) if args.ids else pick(rows, seed=args.seed)
     bench.mkdir(parents=True, exist_ok=True)
     items = [{**row, "stratum": stratum} for row, stratum in chosen]
     selection = {"home": str(home), "owner": args.owner, "owner_name": args.owner_name, "items": items}
+    if args.ids:  # failure cases replay as the owner's glean saw them: with all their addresses
+        selection["owner_addresses"] = owner_addresses(home)
     (bench / "items.json").write_text(json.dumps(selection, indent=1, ensure_ascii=False), encoding="utf-8")
     print(f"{len(items)} emails in {bench / 'items.json'}: {dict(Counter(i['stratum'] for i in items))}")
+
+
+def owner_addresses(home):
+    """The account's address and the owner's others, from the home's glean.toml."""
+    mail = tomllib.loads((home / "glean.toml").read_text(encoding="utf-8")).get("mail", {})
+    return list(dict.fromkeys(a.lower() for a in [mail.get("address", ""), *mail.get("my_addresses", [])] if a))
 
 
 def load(bench):
@@ -411,7 +435,10 @@ def run(args):
     cmd = [sys.executable, str(HERE / "replay.py"), "--home", str(selection["home"]),
            "--ids", *(i["id"] for i in selection["items"]), "--model", args.model, "--parallel", str(args.parallel),
            "--dir", str(bench / "runs" / args.name), "--owner", selection["owner"],
-           "--owner-name", selection["owner_name"]]  # fmt: skip
+           "--owner-name", selection["owner_name"],
+           "--port", str(args.port), "--sift-port", str(args.sift_port)]  # fmt: skip
+    if others := [a for a in selection.get("owner_addresses", []) if a != selection["owner"]]:
+        cmd += ["--my-addresses", *others]
     if args.orbit:
         cmd += ["--orbit", args.orbit]
     subprocess.run(cmd, check=True)
@@ -490,6 +517,36 @@ def clusters(people):
     return list(groups.values())
 
 
+def earlier_tasks(notes, date, limit=40):
+    """The vault's tasks from emails before `date`, latest last, as lines with their status and owner."""
+    dated = []
+    for name, (fields, _) in notes.items():
+        when = str(notes.get(fields.get("origin") or "", ({}, ""))[0].get("date") or "")
+        if fields["type"] == "task" and date and when and when < str(date):
+            dated.append((when, f"- {name} ({fields.get('status')}, {fields.get('owner')})"))
+    return [line for _, line in sorted(dated)[-limit:]]
+
+
+def refused(transcript):
+    """How many of orbit's tools refused a call in a run's transcript."""
+    if not transcript.is_file():
+        return 0
+    lines = transcript.read_text(encoding="utf-8").splitlines()
+    events = [json.loads(line) for line in lines if line.strip()]
+    return sum(not c.ok and c.name.startswith(checks.ORBIT) for c in checks.calls(events))
+
+
+def unlinked(people, orgs):
+    """The names of people without an organization whose address is at an organization's domain or under it."""
+    domains = {norm(d) for o in orgs for d in as_list(o.get("domains"))}
+
+    def known(address):
+        domain = address.rpartition("@")[2]
+        return any(domain == d or domain.endswith("." + d) for d in domains)
+
+    return [p["name"] for p in people if not p.get("org") and any(map(known, emails_of(p)))]
+
+
 def recorded(verdict):
     """The key's verdict for what a run's report says the agent answered."""
     return {"imported": "import", "already_imported": "import", "skipped": "skip", "spam": "spam"}.get(verdict)
@@ -526,10 +583,12 @@ def grade(args):
     reports = {p.parent.name: front_matter(p.read_text(encoding="utf-8")) for p in (replay / "home").rglob("report.md")}
     keys = {i["id"]: json.loads((bench / "key" / f"{i['id']}.json").read_text(encoding="utf-8")) for i in items}
     counts, confusion, judged, wrong = Counter(), Counter(), [], []
+    counts["refused"] = sum(map(refused, (replay / "home" / "runs").rglob("transcript.jsonl")))
     for item in items:
         key, report = keys[item["id"]], reports.get(replayed.get(item["key"]), {})
         got = recorded(report.get("verdict")) or ("failed" if report else "missing")
         confusion[(key["verdict"], got)] += 1
+        counts["imports"] += got == "import"
         if (key["verdict"] == "import") != (got == "import"):
             wrong.append(f"{item['date'][:10]} {item['title'][:60]} ({item['id']}): {key['verdict']}, ran {got}")
         for field in ("cost_usd", "followups", "checks_left"):
@@ -550,18 +609,18 @@ def grade(args):
         observations = [line for _, (_, b) in notes.items() for line in b.splitlines()
                         if line.startswith("- ") and f"[[{name}]]" in line and " · «" in line]  # fmt: skip
         wanted = {"tasks": [t for t in key["tasks"] if t["status"] != "done"],  # done within the email: optional
-                  "owner_facts": key["owner_facts"], "facts": key["facts"]}  # fmt: skip
-        for field, n in (("tasks_expected", len(wanted["tasks"])), ("tasks_recorded", len(tasks)),
-                         ("owner_facts_expected", len(wanted["owner_facts"])), ("facts_expected", len(key["facts"])),
-                         ("observations", len(observations))):  # fmt: skip
-            counts[field] += n
+                  "owner_facts": key["owner_facts"], "facts": key["facts"],
+                  "settled": [t for t in key["tasks"] if t["status"] == "done"]}  # fmt: skip
+        counts.update({"tasks_expected": len(wanted["tasks"]), "tasks_recorded": len(tasks),
+                       "owner_facts_expected": len(wanted["owner_facts"]), "facts_expected": len(key["facts"]),
+                       "observations": len(observations), "settled_expected": len(wanted["settled"])})  # fmt: skip
         records = [notes[n][0] for r in ROLES for n in as_list(fields.get(r)) if n in notes]
         if any(wanted.values()) or tasks or observations:
-            judged.append((item, wanted, tasks, observations, records))
+            judged.append((item, wanted, tasks, observations, records, earlier_tasks(notes, fields.get("date"))))
     claude = str(find_claude(None))
 
     def judge(entry):
-        item, wanted, tasks, observations, records = entry
+        item, wanted, tasks, observations, records, earlier = entry
         prompt = (
             f"The email:\n\n{document_text(home, item)[:TEXT_CHARS]}\n\n---\n\nThe key:\n"
             + json.dumps(wanted, ensure_ascii=False)
@@ -571,17 +630,19 @@ def grade(args):
             + "\n".join(observations)
             + "\n\nThe fields of the people and organizations it linked:\n"
             + "\n".join(json.dumps({k: v for k, v in f.items() if k in SHOWN}, ensure_ascii=False) for f in records)
+            + "\n\nThe vault's earlier tasks:\n"
+            + "\n".join(earlier)
         )
         return item, ask(claude, "sonnet", JUDGE, prompt, JUDGED)
 
     remarks = []
     with ThreadPoolExecutor(max_workers=args.parallel) as pool:
         for item, answer in pool.map(judge, judged):
-            for field in ("tasks_found", "tasks_sound", "owner_facts_found", "facts_found", "observations_sound"):
+            for field in FOUND:
                 counts[field] += int(answer.get(field) or 0)
             if answer.get("remarks"):
                 remarks.append(f"{item['date'][:10]} {item['title'][:60]} ({item['id']}): {answer['remarks']}")
-    result = summary(counts, confusion, keys, items, list(people.values()))
+    result = summary(counts, confusion, keys, items, list(people.values()), list(orgs.values()))
     result["verdicts_wrong"], result["remarks"] = wrong, remarks
     out = bench / "grades"
     out.mkdir(exist_ok=True)
@@ -590,7 +651,7 @@ def grade(args):
     print(markdown(args.name, result))
 
 
-def summary(counts, confusion, keys, items, notes):
+def summary(counts, confusion, keys, items, notes, orgs=()):
     """The grade: verdicts, links, the people across the set against the vault's, tasks and facts."""
     total = sum(confusion.values())
     right = sum(n for (want, got), n in confusion.items() if (want == "import") == (got == "import"))
@@ -615,13 +676,18 @@ def summary(counts, confusion, keys, items, notes):
             "asked": sum(len(h) > 1 and _asked(notes, h) for h in holders),  # a provisional twin, with a review
             "owner_as_person": sum(bool(emails_of(n) & owner) for n in notes),
             "unexpected": sum(not any(n in h for h in holders) for n in range(len(notes))),
+            "split": sum(len(h) > 1 and _split(notes, h) for h in holders),  # twins marked as different people
+            "unlinked": len(unlinked(notes, orgs)),
         },
         "people_missing": [expected[g[0]]["name"] for g, h in zip(groups, holders, strict=True) if not h],
         "people_duplicated": [[notes[n]["name"] for n in sorted(h)] for h in holders if len(h) > 1],
+        "people_unlinked": unlinked(notes, orgs),
         "tasks": {
             "recall": ratio(counts["tasks_found"], counts["tasks_expected"]),
             "precision": ratio(counts["tasks_sound"], counts["tasks_recorded"]),
         },
+        "settled_recall": ratio(counts["settled_found"], counts["settled_expected"]),
+        "refused_per_import": ratio(counts["refused"], counts["imports"]),
         "owner_facts_recall": ratio(counts["owner_facts_found"], counts["owner_facts_expected"]),
         "facts_recall": ratio(counts["facts_found"], counts["facts_expected"]),
         "observations_precision": ratio(counts["observations_sound"], counts["observations"]),
@@ -636,28 +702,28 @@ def _asked(notes, holders):
     return any(notes[n].get("review_status") == "needs_review" for n in holders)
 
 
+def _split(notes, holders):
+    names = {norm(notes[n]["name"]) for n in holders}
+    return any(norm(other) in names for n in holders for other in as_list(notes[n].get("distinct_from")))
+
+
 def review(args):
     """Copy a run to `<name>+review` and let glean's review fix what its imports wrote, in the copy."""
     bench = args.bench.resolve()
     source, target = bench / "runs" / args.name, bench / "runs" / f"{args.name}+review"
     if target.exists():
         raise SystemExit(f"{target} exists already: remove it to review again")
-    shutil.copytree(source, target, ignore=shutil.ignore_patterns("orbit-home"))  # orbit indexes the copy anew
-    home = target / "home"
-    toml = home / "glean.toml"
-    toml.write_text(re.sub(r"127\.0\.0\.1:\d+", f"127.0.0.1:{args.port}", toml.read_text(encoding="utf-8")),
-                    encoding="utf-8")  # fmt: skip
-    env = os.environ | {"ORBIT_HOME": str(target / "orbit-home"), "GLEAN_HOME": str(home)}
+    shutil.copytree(source, target, ignore=shutil.ignore_patterns("orbit-home", "sift-home"))  # indexed anew
+    toml = target / "home" / "glean.toml"
+    text, found = re.subn(r"\[orbit\]\nurl = [^\n]*\n\n\[sift\]\n(url = [^\n]*\n|add_collections = false\n)\n",
+                          settings(args.port, args.sift_port), toml.read_text(encoding="utf-8"))  # fmt: skip
+    if not found:
+        raise SystemExit(f"{toml} has no [orbit] and [sift] tables as replay.py writes them: set their ports by hand")
+    toml.write_text(text, encoding="utf-8")
     orbit = args.orbit or shutil.which("orbit") or sys.exit("orbit isn't on PATH")
-    server = subprocess.Popen([orbit, "serve", str(target / "vault"), "--port", str(args.port)], env=env,
-                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)  # fmt: skip
-    try:
-        wait_for(args.port)
+    with serving(target, target / "vault", orbit, args.port, args.sift_port) as env:
         count = len(load(bench)["items"])
         subprocess.run([sys.executable, "-m", "glean", "mail", "review", "--latest", str(count)], env=env, check=True)
-    finally:
-        server.terminate()
-        server.wait(timeout=10)
 
 
 def markdown(name, result):
@@ -676,16 +742,21 @@ def main():
     s.add_argument("--owner", required=True, help="the account's address")
     s.add_argument("--owner-name", required=True, help="the owner's name, as the emails greet them")
     s.add_argument("--seed", type=int, default=1)
+    s.add_argument("--ids", nargs="*", default=[], help="instead of a mix: these emails, failure cases say")
+    s.add_argument("--context", type=int, default=3, help="with --ids: earlier emails of each one's thread")
     a = sub.add_parser("annotate", help="write the answer key")
     r = sub.add_parser("run", help="import the emails into a new vault with the real agent")
     r.add_argument("--name", required=True, help="the run's name: its folder in runs/")
     r.add_argument("--model", default="haiku")
     r.add_argument("--orbit", help="the orbit command to run (default: the one on PATH)")
+    r.add_argument("--port", type=int, default=8777, help="the replay's orbit port")
+    r.add_argument("--sift-port", type=int, default=8779, help="the replay's own sift's port")
     g = sub.add_parser("grade", help="compare a run with the key")
     g.add_argument("--name", required=True, help="the run to grade")
     v = sub.add_parser("review", help="review a run's imports with glean's review, in a copy: <name>+review")
     v.add_argument("--name", required=True, help="the run to review")
     v.add_argument("--port", type=int, default=8778, help="the copy's orbit port")
+    v.add_argument("--sift-port", type=int, default=8779, help="the copy's own sift's port")
     v.add_argument("--orbit", help="the orbit command to run (default: the one on PATH)")
     for parser in (s, a, r, g, v):
         parser.add_argument("--bench", type=Path, required=True, help="the benchmark's folder, outside any repository")

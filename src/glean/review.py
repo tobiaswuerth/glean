@@ -20,12 +20,13 @@ def digest(home, item):
         return None
     head, _, body = report.read_text(encoding="utf-8").removeprefix("---\n").partition("\n---\n")
     fields = {k: _plain(v) for k, _, v in (line.partition(": ") for line in head.splitlines())}
+    heading = f"### {item.id} · {item.date[:10]} · {item.status} · {item.title or '(no title)'} · from {item.author}"
+    if item.status == "skipped":  # its reason tells a wrong verdict; the review rereads it on every turn
+        spam = "spam: " if fields.get("verdict") == "spam" else ""
+        return f"{heading}: {spam}{fields.get('reason', '')}"
     body = " ".join(body.split())
     cut = body[:DIGEST_CHARS] + ("…" if len(body) > DIGEST_CHARS else "")
-    return (
-        f"### {item.id} · {item.date[:10]} · {item.status} · {item.title or '(no title)'} · from {item.author}\n"
-        f"verdict {fields.get('verdict', '?')}: {fields.get('reason', '')}\n{cut}"
-    )
+    return f"{heading}\nverdict {fields.get('verdict', '?')}: {fields.get('reason', '')}\n{cut}"
 
 
 def _plain(value):

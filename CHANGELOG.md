@@ -244,7 +244,7 @@ collections to set up by hand, and one run at a time.
 
 ### Fixed
 
-- Headers written as raw 8-bit text, such as an unencoded `Würth` in `To:`, are read as UTF-8 (or Windows-1252)
+- Headers written as raw 8-bit text, such as an unencoded `Müller` in `To:`, are read as UTF-8 (or Windows-1252)
   instead of breaking the email's document.
 
 ## [0.1.0] - 2026-10-22

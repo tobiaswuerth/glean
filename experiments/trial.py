@@ -1,15 +1,14 @@
-"""A trial import, end to end, with nothing real at stake: a made-up mailbox, a new orbit vault served on its own port,
-and a glean home of its own; then glean downloads, imports with the real agent, and prints each run's report. sift is
-the running one: it is only searched, glean adds no collections to it (add_collections = false), and it refuses to
-index the trial's files, which are in none of its collections.
+"""A trial import, end to end, with nothing real at stake: a made-up mailbox, a new orbit vault and a sift of its own,
+each served on its own port with its home in the trial's folder, and a glean home of its own; then glean downloads,
+imports with the real agent, and prints each run's report.
 
     uv run python experiments/trial.py [--dir FOLDER] [--count N] [--port 8776] [--only 01-offer 02-reply]
 
-Needs `orbit` on PATH, sift serving on its usual port, and Claude Code signed in. Each email is a real agent run.
-The folder is kept, so the vault can be opened in Obsidian and the reports read again; give a new --dir for a new
-trial."""
+Needs `orbit` and `sift` on PATH and Claude Code signed in. Each email is a real agent run. The folder is kept, so the
+vault can be opened in Obsidian and the reports read again; give a new --dir for a new trial."""
 
 import argparse
+import contextlib
 import os
 import shutil
 import socket
@@ -22,14 +21,41 @@ from pathlib import Path
 from make_mail import mailbox
 
 
-def wait_for(port, seconds=30):
+def wait_for(port, seconds=30, name="orbit"):
     deadline = time.monotonic() + seconds
     while time.monotonic() < deadline:
         with socket.socket() as s:
             if s.connect_ex(("127.0.0.1", port)) == 0:
                 return
         time.sleep(0.3)
-    raise SystemExit(f"orbit didn't start on port {port}")
+    raise SystemExit(f"{name} didn't start on port {port}")
+
+
+def settings(orbit_port, sift_port):
+    """glean.toml's tables for servers on these ports."""
+    return (f'[orbit]\nurl = "http://127.0.0.1:{orbit_port}/mcp/write"\n\n'
+            f'[sift]\nurl = "http://127.0.0.1:{sift_port}/mcp"\n\n')  # fmt: skip
+
+
+@contextlib.contextmanager
+def serving(root, vault, orbit, port, sift_port):
+    """orbit serving the vault on `port`, and a sift of the trial's own on `sift_port`, each with its home under
+    `root`, while the block runs: the environment for glean, whose home is root/home. The owner's servers and indexes
+    are never touched."""
+    env = os.environ | {"ORBIT_HOME": str(root / "orbit-home"), "SIFT_HOME": str(root / "sift-home"),
+                        "GLEAN_HOME": str(root / "home")}  # fmt: skip
+    sift = shutil.which("sift") or sys.exit("sift isn't on PATH")
+    started = []
+    try:
+        for cmd, at, name in (([orbit, "serve", str(vault), "--port", str(port)], port, "orbit"),
+                              ([sift, "serve", "--port", str(sift_port)], sift_port, "sift")):  # fmt: skip
+            started.append(subprocess.Popen(cmd, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
+            wait_for(at, 120, name)
+        yield env
+    finally:
+        for server in started:
+            server.terminate()
+            server.wait(timeout=10)
 
 
 def main():
@@ -37,6 +63,7 @@ def main():
     p.add_argument("--dir", type=Path, help="where to keep the trial (default: a new temporary folder)")
     p.add_argument("--count", type=int, default=10, help="emails to import, oldest first (default: %(default)s)")
     p.add_argument("--port", type=int, default=8776, help="the test vault's orbit port (default: %(default)s)")
+    p.add_argument("--sift-port", type=int, default=8779, help="the trial's own sift's port (default: %(default)s)")
     p.add_argument("--only", nargs="*", help="only the made-up emails whose file names start with these")
     args = p.parse_args()
     root = (args.dir or Path(tempfile.mkdtemp(prefix="glean-trial-"))).resolve()
@@ -54,24 +81,17 @@ def main():
                    capture_output=True)  # fmt: skip
     home.mkdir(parents=True)
     (home / "glean.toml").write_text(
-        f'[orbit]\nurl = "http://127.0.0.1:{args.port}/mcp/write"\n\n[sift]\nadd_collections = false\n\n'
-        f'[mail]\naddress = "tobias@example.com"\neml_folder = "{eml.as_posix()}"\n',
+        settings(args.port, args.sift_port)
+        + f'[mail]\naddress = "tobias@example.com"\neml_folder = "{eml.as_posix()}"\n',
         encoding="utf-8",
     )
-    env = os.environ | {"ORBIT_HOME": str(root / "orbit-home"), "GLEAN_HOME": str(home)}
-    server = subprocess.Popen([orbit, "serve", str(vault), "--port", str(args.port)], env=env,
-                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)  # fmt: skip
-    try:
-        wait_for(args.port)
+    with serving(root, vault, orbit, args.port, args.sift_port) as env:
         glean = [sys.executable, "-m", "glean"]
         subprocess.run([*glean, "mail", "download"], env=env, check=True)
         subprocess.run([*glean, "mail", "run", "--oldest", str(args.count)], env=env)
-        for report in sorted((home / "runs").rglob("report.md")):
-            print(f"\n{'=' * 100}\n{report.parent.name}\n")
-            print(report.read_text(encoding="utf-8").split("---\n", 2)[-1].strip())
-    finally:
-        server.terminate()
-        server.wait(timeout=10)
+    for report in sorted((home / "runs").rglob("report.md")):
+        print(f"\n{'=' * 100}\n{report.parent.name}\n")
+        print(report.read_text(encoding="utf-8").split("---\n", 2)[-1].strip())
     print(f"\nThe trial is in {root}: the vault in crm-test/, glean's home in home/.")
 
 

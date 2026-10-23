@@ -52,6 +52,20 @@ def test_a_digest_says_what_the_item_was_what_the_run_answered_and_its_report(ba
     assert "verdict imported: by hand\n" in review.digest(notes.home, item)  # a value as a hand edit left it
 
 
+def test_a_skipped_item_s_digest_is_a_line(batch):
+    # Most items are skipped; their line, with the reason, tells a wrong verdict, and a review rereads its input on
+    # every turn.
+    cfg, notes, state, _ = batch
+    skipped = agent.Result("success", True, "Skipped.", None, 0.01, 2, 9, verdict="skipped", summary="Acme's news")
+    item = state.reset(state.find("notes", "c"))
+    pipeline.run(cfg, notes, state, FakeAgent([skipped]), [item], print, print)
+    text = review.digest(notes.home, state.find("notes", "c"))
+    assert text == f"### {item.id} · 2026-10-03 · skipped · Note c · from someone: Acme's news"
+    spam = agent.Result("success", True, "Spam.", None, 0.01, 2, 9, verdict="spam", summary="a fake invoice")
+    pipeline.run(cfg, notes, state, FakeAgent([spam]), [state.reset(state.find("notes", "c"))], print, print)
+    assert review.digest(notes.home, state.find("notes", "c")).endswith("from someone: spam: a fake invoice")
+
+
 def test_items_without_a_report_of_their_own_have_no_digest(batch):
     _, notes, state, _ = batch
     item = state.reset(state.find("notes", "a"))
@@ -85,8 +99,9 @@ def test_the_owner_s_questions_are_listed_for_them(batch):
     said = []
     review.run(cfg, notes, state, reviewer, items[:2], say=said.append, now=lambda: NOW)
     (report,) = (notes.home / "runs" / "reviews").glob("*.md")
-    assert "## Questions for you, in orbit's reviews\n\n- Is Example Bank your bank?\n- Who is" in report.read_text(
-        encoding="utf-8"
+    assert (
+        "## Questions for you, in orbit's reviews\n\n- Is Example Bank your bank?\n- Who is Anna"
+        in report.read_text(encoding="utf-8")
     )
     assert said[-1].startswith("reviewed 2 imports ($1.50): 2 questions for you in orbit, 0 to import again; ")
 

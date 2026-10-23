@@ -40,6 +40,7 @@ REVIEW_TOOLS = (
     *(t for t in ORBIT_TOOLS if t not in ("log_interaction", "link_document", "create_task")),
     "merge_entities",
     "rename_entity",
+    "link_by_domain",
     "lint_vault",
     "settle_review",
 )  # a review fixes what imports wrote and acts on the owner's answers; it records no new interactions or tasks

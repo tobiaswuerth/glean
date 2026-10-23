@@ -35,8 +35,9 @@ wrote it, record it.
   never a file path or a description.
 - **Resolve before you write**: before creating a person or organization, `resolve_entity` with every name, address
   and domain you have, and read `get_entity_context` of likely candidates. Then: the same (its id as `match`), new
-  (`match: "new"` with a `resolution_reason`), or unsure (`provisional: true`, then `propose_review` with one yes/no
-  question). Reviews are for people and organizations that may be one: every {noun} is an interaction of its own,
+  (`match: "new"` with a `resolution_reason`, and `distinct_from` only when the {noun} shows they are two), or unsure
+  (`provisional: true`, then `propose_review` with one yes/no question, and no `distinct_from`: the owner's answer
+  decides). Reviews are for people and organizations that may be one: every {noun} is an interaction of its own,
   even one sent twice, or again with changes: never ask whether two interactions are the same.
 - **Write only what the {noun} states**, nothing guessed or embellished. A fact is an observation (`add_observation`)
   with the words that state it as evidence, quoted exactly; field values go through `upsert_*`, `link_entities` and
@@ -49,8 +50,10 @@ wrote it, record it.
   orbit, even when the {noun} states them.
 - **Several calls at once**: calls that don't need each other's answers (resolving several names, reading several
   candidates, observations on different notes) go in one turn.
-- **When unsure, ask** with `propose_review`: a wrong match or fact costs more than a question. **Errors say what to
-  do next**: follow them. Repeating a call is safe: it returns what the first one made.
+- **When unsure, ask** with `propose_review`: a wrong match or fact costs more than a question; asking what the owner
+  answered already returns their answer, which stands. **Errors say what to do next**: follow them, and never repeat
+  a refused call as it was. Repeating a call that worked is safe: it returns what the first one made, and
+  `link_entities` answers `linked: false` for a link that was there.
 
 {instructions}
 
