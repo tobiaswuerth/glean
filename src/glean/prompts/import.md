@@ -62,7 +62,9 @@ wrote it, record it.
 
 ## Documents the {noun} refers to
 
-A document it refers to but doesn't attach (an offer, a contract, minutes): search sift with `query`{documents}, and
+sift holds other {noun}s too, later ones among them: what they say is theirs to record, when they are imported, never
+this {noun}'s (no task closed, no fact taken from them). A document it refers to but doesn't attach (an offer, a
+contract, minutes): search sift with `query`{documents}, and
 link a clear match to the interaction with `link_document`; leave anything less than clear out, and say so.
 
 ## Indexing
