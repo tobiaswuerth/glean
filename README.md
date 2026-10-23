@@ -58,7 +58,7 @@ updates people, organizations and tasks, and makes the item searchable. Neither 
 - Python 3.11 or newer.
 - [Claude Code](https://claude.com/claude-code) 2.1.290 or newer, signed in (`claude auth status`). On Windows, the
   native installer's `claude.exe`.
-- [orbit](https://github.com/tobiaswuerth/orbit) 0.7.1 or newer and [sift](https://github.com/tobiaswuerth/sift) 1.3.1
+- [orbit](https://github.com/tobiaswuerth/orbit) 0.8.0 or newer and [sift](https://github.com/tobiaswuerth/sift) 1.3.1
   or newer (1.3.0 doesn't index the attachments the agent gives it), each serving MCP over HTTP: `orbit serve <vault>`
   (port 8775) and `sift serve` (port 8765). Give orbit's vault your addresses when you create it, with
   `orbit init <vault> --email you@example.com`.
