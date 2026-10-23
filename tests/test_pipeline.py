@@ -98,6 +98,7 @@ def test_the_system_prompt_imports_automated_mail_that_settles_a_fact_about_the_
     cfg, notes, _ = setup
     prompt = " ".join(pipeline.system_prompt(cfg, notes).split())
     assert "a company's answer to the owner's own request" in prompt
+    assert "what a person wrote to people, however short or passing" in prompt  # not skipped as passing logistics
     assert "an automated note that settles a lasting fact about the owner" in prompt
     assert "These facts go on Me only" in prompt
 
