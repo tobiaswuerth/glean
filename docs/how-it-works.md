@@ -102,9 +102,9 @@ brought:
 
 | Table | Holds |
 |---|---|
-| `items` | one row per item: key (an email's Message-ID), id, date, title, author, direction, the original's path and sha256, the document's path, and what the download, your `skip_senders` or you decided: `new`, `skipped` (with the pattern), `failed` (unreadable) or `ignored` |
+| `items` | one row per item: key (an email's Message-ID), id, date, title, author, direction, the original's path and sha256, the document's path, and what the download, your `skip_senders` or you decided: `new`, `skipped` (with the pattern), `failed` (unreadable, or a server's notice in its place) or `ignored` |
 | `locations` | every place an item was found: an email in Inbox and Archive is one item in two places |
-| `cursors` | where the last download of each folder ended: for IMAP, its UIDVALIDITY and last UID |
+| `cursors` | how far each folder is downloaded, where the next download starts: for IMAP, its UIDVALIDITY and last UID |
 | `contacts` | the addresses the owner has written to |
 | `marks` | what glean keeps for the source, such as the version its items were brought in line with |
 
