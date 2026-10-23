@@ -139,6 +139,7 @@ a `.siftignore`, since sift reads each email's Markdown document. It finds the v
 
 ```bash
 glean mail download            # fetch what is new; the first time, everything
+glean mail download --oldest 500  # only the 500 oldest of it; the next download takes the rest
 glean mail list --oldest 20    # the 20 oldest not yet imported, in the order run takes them
 glean mail run --oldest 20     # import them, oldest first, one agent run each, then review what they wrote
 glean mail review --latest 50  # review the 50 latest imports again

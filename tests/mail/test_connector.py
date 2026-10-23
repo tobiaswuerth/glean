@@ -2,6 +2,7 @@
 
 import datetime
 import hashlib
+import os
 from types import SimpleNamespace
 
 import pytest
@@ -104,6 +105,62 @@ def test_download_over_imap_reads_only_and_continues_where_it_stopped(tmp_path, 
     server.folders["Inbox"]["messages"][3] = samples.forwarded()
     report = mail.download(state)
     assert (report.new, report.known) == (1, 0)
+    assert state.cursor("mail", "Inbox") == "1:3"
+
+
+def dated_eml_folder(tmp_path):
+    """Five emails, day1 to day5, each arrived a day after the one before; the odd days in Inbox, the even in Sent."""
+    root = tmp_path / "eml"
+    (root / "Sent").mkdir(parents=True)
+    for day in range(1, 6):
+        path = (root if day % 2 else root / "Sent") / f"{day}.eml"
+        path.write_bytes(samples.plain(message_id=f"<day{day}@x>"))
+        stamp = datetime.datetime(2026, 10, day, tzinfo=datetime.UTC).timestamp()
+        os.utime(path, (stamp, stamp))
+
+
+def downloaded(state):
+    return [d for d in range(1, 6) if state.find("mail", f"day{d}@x")]
+
+
+def test_a_download_of_the_oldest_n_takes_them_across_folders_and_the_next_continues(tmp_path, state):
+    dated_eml_folder(tmp_path)
+    mail, said = connector(tmp_path, eml=True)
+    report = mail.download(state, oldest=2)
+    assert (report.new, report.waiting) == (2, 3)
+    assert downloaded(state) == [1, 2]
+    assert "Inbox: downloading 1 email" in said
+    report = mail.download(state, oldest=2)
+    assert (report.new, report.waiting) == (2, 1)
+    assert downloaded(state) == [1, 2, 3, 4]
+    report = mail.download(state)
+    assert (report.new, report.waiting) == (1, 0)
+
+
+def test_a_download_of_the_latest_n_takes_the_newest(tmp_path, state):
+    dated_eml_folder(tmp_path)
+    mail, _ = connector(tmp_path, eml=True)
+    report = mail.download(state, latest=3)
+    assert (report.new, report.waiting) == (3, 2)
+    assert downloaded(state) == [3, 4, 5]
+
+
+def test_a_limited_download_over_imap_keeps_the_cursor_of_a_folder_with_mail_left(tmp_path, state, monkeypatch):
+    first, second, third = (samples.plain(message_id=f"<day{d}@x>") for d in (1, 2, 3))
+    server = FakeImap(
+        {
+            "Inbox": {"validity": 1, "messages": {1: first, 2: second, 3: third}},
+            "Sent": {"flags": "\\Sent", "validity": 1, "messages": {9: first}},
+        }
+    )
+    mail, _ = connector(tmp_path)
+    monkeypatch.setattr(mail, "mailbox", lambda: imap.Imap("h", 993, "tobias@example.com", lambda: "T", server))
+    report = mail.download(state, oldest=2)
+    assert (report.new, report.known, report.waiting) == (2, 1, 1)  # Sent's copy of the first doesn't count
+    assert state.find("mail", "day1@x").containers == ("Inbox", "Sent")
+    assert (state.cursor("mail", "Inbox"), state.cursor("mail", "Sent")) == (None, "1:9")
+    report = mail.download(state, oldest=2)
+    assert (report.new, report.known, report.waiting) == (1, 0, 0)
     assert state.cursor("mail", "Inbox") == "1:3"
 
 

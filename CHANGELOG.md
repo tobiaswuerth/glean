@@ -5,6 +5,11 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- `glean mail download --oldest N` (or `--latest N`) downloads only the N oldest (newest) new emails of all folders;
+  the next download takes those left, and the result line says how many are.
+
 ## [0.9.0] - 2026-10-23
 
 People at their organization, tasks that later mail settles, answers that aren't asked again, a log per run.

@@ -40,6 +40,25 @@ glean asks for below. Each step is described at
 """
 
 
+def _first(pool, count, newest):
+    """The (folder name, ref) of the `count` oldest of these (folder name, Header), or the newest; all without a count.
+    Those of unknown date come last. A copy of a message taken from another folder comes along without counting."""
+    if count is None:
+        return {(name, h.ref) for name, h in pool}
+    dated = sorted((p for p in pool if p[1].received), key=lambda p: p[1].received, reverse=newest)
+    taken, ids, counted = set(), set(), 0
+    for name, header in dated + [p for p in pool if not p[1].received]:
+        key = header.message_id and message.normalize_id(header.message_id)
+        if not (key and key in ids):
+            if counted == count:
+                continue
+            counted += 1
+        taken.add((name, header.ref))
+        if key:
+            ids.add(key)
+    return taken
+
+
 def _login(connector, args):
     user = connector.account().login(device_code=args.device_code, say=connector.say)
     print(f"signed in as {user}")
@@ -127,38 +146,49 @@ class Mail(Connector):
                 picked.append(folder)
         return picked
 
-    def download(self, state):
+    def download(self, state, oldest=None, latest=None):
         report = Downloaded()
         contacts = self._contacts(state)
         with self.mailbox() as box:
+            scanned = []
             for folder in self.chosen(box.folders()):
                 headers, cursor = box.scan(folder, state.cursor(self.name, folder.name))
-                todo = self._unknown(state, folder, headers, report)
-                if todo:
-                    self.say(f"{folder.name}: downloading {console.count(len(todo), self.noun)}")
-                received = {h.ref: h.received for h in todo}
-                arrived = set()
-                for n, (ref, raw) in enumerate(box.fetch(folder, todo), 1):
-                    arrived.add(ref)
-                    stored = self._store(state, folder.name, ref, raw, received.get(ref), contacts)
-                    if stored is None:
-                        report.known += 1
-                    else:
-                        report.new += 1
-                        report.skipped += stored.status == "skipped"
-                        report.places[folder.name] = report.places.get(folder.name, 0) + 1
-                    if n % PROGRESS_EVERY == 0:
-                        self.say(f"{folder.name}: {n:,} of {len(todo):,}")
-                if missing := len(todo) - len(arrived):  # keep the old cursor, so that the next download asks again
-                    lost = console.count(missing, self.noun)
-                    self.say(f"{folder.name}: {lost} didn't arrive; the next download asks again")
-                    continue
-                state.set_cursor(self.name, folder.name, cursor or "")
+                scanned.append((folder, self._unknown(state, folder, headers, report), cursor))
+            wanted = _first([(f.name, h) for f, todo, _ in scanned for h in todo], oldest or latest, bool(latest))
+            for folder, todo, cursor in scanned:
+                taken = [h for h in todo if (folder.name, h.ref) in wanted]
+                report.waiting += len(todo) - len(taken)
+                # a copy of a message stored from an earlier folder just now is recorded here too, not fetched again
+                fetched = self._fetch(state, box, folder, self._unknown(state, folder, taken, report), report, contacts)
+                if fetched and len(taken) == len(todo):  # else the next download scans this folder from here again
+                    state.set_cursor(self.name, folder.name, cursor or "")
         if rescued := self._rescue(state, contacts):
             self.say(
                 f"{console.count(rescued, 'skipped ' + self.noun)} from people you wrote to: waiting to be imported"
             )
         return report
+
+    def _fetch(self, state, box, folder, todo, report, contacts):
+        """Download these messages of a folder. False if some didn't arrive, so that the next download asks again."""
+        if todo:
+            self.say(f"{folder.name}: downloading {console.count(len(todo), self.noun)}")
+        received = {h.ref: h.received for h in todo}
+        arrived = set()
+        for n, (ref, raw) in enumerate(box.fetch(folder, todo), 1):
+            arrived.add(ref)
+            stored = self._store(state, folder.name, ref, raw, received.get(ref), contacts)
+            if stored is None:
+                report.known += 1
+            else:
+                report.new += 1
+                report.skipped += stored.status == "skipped"
+                report.places[folder.name] = report.places.get(folder.name, 0) + 1
+            if n % PROGRESS_EVERY == 0:
+                self.say(f"{folder.name}: {n:,} of {len(todo):,}")
+        if missing := len(todo) - len(arrived):
+            self.say(f"{folder.name}: {console.count(missing, self.noun)} didn't arrive; the next download asks again")
+            return False
+        return True
 
     def upgrade(self, state):
         """Apply the owner's skip_senders to the mail no agent ran on yet, so that what older gleans' own rules

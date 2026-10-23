@@ -2,7 +2,7 @@
 
 ```
 glean <source> download    the source's new items → its archive (originals and documents) and the archive's
-                           database; then sift indexes them
+                           database; then sift indexes them. --oldest N / --latest N: only that many
 glean <source> list        the items not yet imported, oldest first
 glean <source> run         oldest first, several at a time where they share no people or thread:
                              1. document   the connector writes the item's Markdown, and files sift can read
@@ -140,7 +140,9 @@ imported twice is still one interaction. A retry tells the agent so, and it comp
   read except those the server marks as junk, trash or drafts and those in `exclude_folders`. A download fetches the
   Message-IDs of new messages first, so a copy of a known email isn't downloaded twice, then the messages in batches,
   and can be stopped and started again at any time. A message the server leaves out of its answer is asked for again
-  by the next download.
+  by the next download. `--oldest N` (or `--latest N`) takes only the N oldest (newest) new messages of all folders,
+  by when the server got them; a copy in another folder comes along without counting. A folder with messages left
+  keeps its cursor, so the next download takes them.
 - **Sign-in** is OAuth2 with [MSAL](https://github.com/AzureAD/microsoft-authentication-library-for-python), in
   glean's own process: the browser opens Microsoft's page, MSAL takes the answer on a local port. See
   [microsoft-app.md](microsoft-app.md).
@@ -282,7 +284,7 @@ A source is a `Connector` (`glean/connectors/base.py`) registered in `glean/conn
 | `name`, `noun`, `help` | its command group and table in `glean.toml` (`mail`), what an item is called (`email`), one line of help |
 | `configure(table)` | reads its table of `glean.toml`; the result has `archive` and `collection` |
 | `setup(ask, say)` | asks what its table needs, for `glean setup`; returns the table |
-| `download(state)` | stores what is new in the archive and its database, without changing the source |
+| `download(state, oldest, latest)` | stores what is new in the archive and its database, or only the N oldest or newest of it, without changing the source |
 | `document(item)` | writes the item's Markdown and the files sift should index; returns a `Document`, with `related`: what the item shares with others it mustn't be imported beside |
 | `instructions()` | the source's part of the agent's prompt |
 | `commands`, `ignored`, `check()`, `key()`, `upgrade()`, `after_setup()` | optional: commands of its own (`login`), files sift should leave out, checks for `glean doctor`, how a person writes a key, bringing an older glean's items in line, a step after setup |
