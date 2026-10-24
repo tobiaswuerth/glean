@@ -5,12 +5,13 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.12.1] - 2026-10-24
+
 ### Changed
 
 - The import prompt imports an automated email that settles a case or request of the owner's (an account restored, a
   request accepted or refused, a case closed, a refund made), so that the task waiting for it is closed, and a
   receipt of the owner's request only when it quotes the owner's own words.
-
 - An email the model's usage policy refuses to read (as it refuses phishing) is skipped with that reason instead of
   failed, and doesn't count toward the circuit breaker: retrying gets the same refusal, and a stretch of phishing could
   stop a batch. `glean mail reset` brings one back.
