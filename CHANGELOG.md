@@ -5,6 +5,10 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-10-24
+
+Open tasks an email settles are closed first; the review finds the names of people known by an address handle.
+
 ### Changed
 
 - The import prompt closes the open tasks an email settles before it makes new ones, with the signs the reviews kept
