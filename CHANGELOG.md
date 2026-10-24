@@ -5,6 +5,11 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- The review looks up the name of a person named after an address handle: it searches sift for the address (another
+  email, a CC list or a newsletter often names the person) before it renames the note or leaves it.
+
 ## [0.11.2] - 2026-10-24
 
 ### Changed
