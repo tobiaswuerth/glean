@@ -9,6 +9,8 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 - The import prompt imports the receipt of an application (a job, a course, a place), whose fact goes on Me, and a
   company's receipt of the owner's request when it quotes the request, the first message of that thread.
+- The review leaves an imported application receipt, as it leaves other automated mail that settles a fact about the
+  owner.
 
 ### Fixed
 
