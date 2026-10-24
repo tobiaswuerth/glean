@@ -5,6 +5,8 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.11.1] - 2026-10-24
+
 ### Fixed
 
 - A download or run waits for sift's index of the archive however long it takes: a first index of a large archive,
