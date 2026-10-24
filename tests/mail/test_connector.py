@@ -251,6 +251,8 @@ def test_the_instructions_close_what_an_email_settles_and_reuse_a_copys_task(tmp
     # Tasks a later reply settled stayed open for years, and a notice sent twice made two tasks.
     text = " ".join(connector(tmp_path)[0].instructions().split())
     assert "or is a copy of the email that made it" in text
+    assert "**Open tasks, before new ones**: `log_interaction` lists the open tasks" in text
+    assert "a later step shows it took place (an offer after the interview" in text
 
 
 def test_the_instructions_name_the_owners_addresses(tmp_path):
