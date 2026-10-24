@@ -5,6 +5,8 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.11.2] - 2026-10-24
+
 ### Changed
 
 - The import prompt imports the receipt of an application (a job, a course, a place), whose fact goes on Me, and a
