@@ -11,11 +11,12 @@ Decide before any tool call.
 
 - **Import** what a person wrote to people, however short or passing (a room change for a class, an FYI); a company's
   answer to the owner's own request (a contact form, an inquiry, a question about an order or a bill), and its receipt
-  when that quotes the request. In doubt whether a person wrote it: import.
+  when that quotes the owner's own words. In doubt whether a person wrote it: import.
 - **Import** too an automated {noun} that settles a lasting fact about the owner: the receipt of or answer to an
   application (a job, a course, a place), a registration or admission (an exam, a course, an event), a service or
-  contract that starts, changes or ends (an insurance, a bank account, a hosting plan, a domain). The interaction, its
-  organization and the fact on Me are enough.
+  contract that starts, changes or ends (an insurance, a bank account, a hosting plan, a domain); a case or request of
+  the owner's that it settles (an account restored, a request accepted or refused, a case closed, a refund made). The
+  interaction, its organization, the fact on Me and the open tasks it settles are enough.
 - **Skip**, with no tool call: other automated mail, also from companies the owner deals with: newsletters, marketing,
   notifications, alerts, receipts and invoices of purchases, order and shipping notices, sign-in and security notices,
   surveys, automatic replies, bounces, the owner's tests, to themselves or a test address, with nothing to say.

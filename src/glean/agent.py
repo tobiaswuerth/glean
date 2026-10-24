@@ -108,6 +108,7 @@ MIN_VERSION = (2, 1, 290)  # --json-schema's answer kept when the connection dro
 PROBE_SECONDS = 60  # how long the check before a batch may take to start
 EXIT_SECONDS = 15  # how long a run that gave its result may take to exit
 FOLLOWUPS = 2  # how often glean sends a run back with what its checks found left to do
+POLICY = "anthropic.com/legal/aup"  # in the text of a result the model's usage policy refused: what it read, not glean
 NO_ANSWER = f"no answer came: give it with the {ANSWER} tool, its outcome, reason and report"
 FOLLOWUP = (
     "glean checked your import, and this is left to do:\n{problems}\n\nDo it with the tools, then give your answer "
@@ -374,6 +375,8 @@ class Agent:
 
 def _result(event):
     subtype = event.get("subtype") or "unknown"
+    if event.get("is_error") and POLICY in str(event.get("result") or ""):
+        subtype = "policy_refusal"
     ok = subtype == "success" and not event.get("is_error")
     answer = event.get("structured_output")
     answer = answer if isinstance(answer, dict) else {}

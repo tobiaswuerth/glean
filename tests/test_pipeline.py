@@ -112,7 +112,8 @@ def test_the_system_prompt_imports_what_people_wrote_and_automated_mail_that_set
     prompt = " ".join(pipeline.system_prompt(cfg, notes).split())
     assert "what a person wrote to people, however short or passing" in prompt
     assert "own request (a contact form, an inquiry, a question about an order or a bill)" in prompt
-    assert "and its receipt when that quotes the request" in prompt
+    assert "and its receipt when that quotes the owner's own words" in prompt
+    assert "a case or request of the owner's that it settles (an account restored" in prompt
     assert (
         "an automated note that settles a lasting fact about the owner: the receipt of or answer to an application"
         in (prompt)
@@ -273,6 +274,20 @@ def test_the_system_prompt_takes_a_sender_s_history_as_evidence_only(setup):
     prompt = " ".join(pipeline.system_prompt(cfg, notes).split())
     assert "how earlier notes from the same sender went" in prompt
     assert "a sender whose notes were skipped can still send one to import" in prompt
+
+
+def test_an_item_the_model_s_usage_policy_refused_is_skipped_and_said_so(setup, monkeypatch):
+    cfg, notes, state = setup
+    monkeypatch.setattr(pipeline, "TROUBLE_WINDOW", 1)
+    monkeypatch.setattr(pipeline, "TROUBLE_LIMIT", 1)
+    refused = agent.Result("policy_refusal", False, reason="API Error: Haiku can't help with this.")
+    counts = pipeline.run(cfg, notes, state, FakeAgent([refused]), pipeline.choose(state, notes, 1), print, print)
+    item = state.find("notes", "a")
+    assert (counts, item.status) == ({"skipped": 1}, "skipped")  # and the breaker didn't trip
+    assert (
+        item.reason
+        == "refused by the model's usage policy, as it refuses phishing: API Error: Haiku can't help with this."
+    )
 
 
 def test_a_run_without_an_answer_fails_so_that_it_can_be_tried_again(setup):

@@ -175,6 +175,14 @@ def test_an_error_reported_as_text(tmp_path, fake):
     assert (result.ok, result.reason) == (False, "API Error: overloaded")
 
 
+def test_a_run_the_model_s_usage_policy_refused(tmp_path, fake):
+    # Phishing emails were refused as abuse; as failures, a spam-heavy stretch could stop a batch.
+    fake("policy")
+    result = make(tmp_path).run("p", "m")
+    assert (result.outcome, result.ok) == ("policy_refusal", False)
+    assert result.reason.startswith("API Error: Haiku can't help with this.")
+
+
 def test_a_run_that_takes_too_long(tmp_path, fake):
     fake("hang")
     a = make(tmp_path, "timeout_minutes = 0.02\n")
