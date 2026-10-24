@@ -32,11 +32,11 @@ def mail_home(home, monkeypatch, tmp_path):
     (eml / "a.eml").write_bytes(samples.plain())
     (eml / "b.eml").write_bytes(samples.html_only())
     (eml / "c.eml").write_bytes(samples.with_attachments())
-    (eml / "Sent" / "d.eml").write_bytes(samples.plain(message_id="<mine@x>", sender="tobias@example.com",
+    (eml / "Sent" / "d.eml").write_bytes(samples.plain(message_id="<mine@x>", sender="john@example.com",
                                                        date="Thu, 15 Oct 2026 18:00:00 +0200"))  # fmt: skip
     home.mkdir()
     (home / "glean.toml").write_text(
-        f'[mail]\naddress = "tobias@example.com"\nskip_senders = ["news@*"]\neml_folder = {json.dumps(str(eml))}\n',
+        f'[mail]\naddress = "john@example.com"\nskip_senders = ["news@*"]\neml_folder = {json.dumps(str(eml))}\n',
         encoding="utf-8",
     )
     real = agent.Agent
@@ -72,7 +72,7 @@ def test_the_whole_flow(mail_home, capsys):
     assert len(lines) == 3  # the newsletter is skipped
     assert "Offerte Wartungsvertrag 2027" in lines[0]
     assert "<- Hans Müller <hans.mueller@acm…" in lines[0]
-    assert "-> tobias@example.com" in lines[2]
+    assert "-> john@example.com" in lines[2]
     code, out, _ = run(capsys, "mail", "list", "--include-skipped", "--json")
     assert [i["title"] for i in json.loads(out)][-1] == "Newsletter"
 
@@ -239,7 +239,7 @@ def test_setup_command(capsys, monkeypatch):
 def test_login_command_reaches_the_connector(mail_home, capsys, monkeypatch):
     class App:
         def get_accounts(self, username=None):
-            return [{"username": "tobias@example.com"}]
+            return [{"username": "john@example.com"}]
 
         def remove_account(self, account):
             pass

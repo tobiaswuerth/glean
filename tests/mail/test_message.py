@@ -17,13 +17,13 @@ def test_a_plain_email():
     assert m.subject == "Offerte Wartungsvertrag 2027"
     assert m.date == datetime.datetime(2026, 10, 14, 9, 32, tzinfo=datetime.timezone(datetime.timedelta(hours=2)))
     assert [str(a) for a in m.from_] == ["Hans Müller <hans.mueller@acme.example>"]
-    assert m.to[0].name == "Tobias Würth"
-    assert m.to[0].email == "tobias@example.com"
+    assert m.to[0].name == "John Doe"
+    assert m.to[0].email == "john@example.com"
     assert m.cc == m.bcc == m.reply_to == ()
     assert m.sender is None
     assert m.in_reply_to is None
     assert m.references == ()
-    assert m.text.startswith("Grüezi Herr Würth\n\nAnbei die Offerte.")
+    assert m.text.startswith("Grüezi Herr Doe\n\nAnbei die Offerte.")
     assert "\r" not in m.text
     assert m.attachments == m.attached == ()
 
@@ -163,7 +163,7 @@ def test_other_text_parts_are_left_out_and_unnamed_files_named():
 RAW_8BIT = (
     b"Message-ID: <raw@x>\r\n"
     b'From: "J\xc3\xbcrg M\xc3\xbcller" <juerg@example.ch>\r\n'  # UTF-8, not encoded as RFC 2047 asks
-    b'To: "Tobias W\xfcrth" <tobias@example.com>\r\n'  # Latin-1, the same
+    b'To: "Lea M\xfcller" <lea@example.com>\r\n'  # Latin-1, the same
     b"Subject: Gr\xc3\xbcsse\r\n"
     b"Content-Type: text/plain; charset=utf-8\r\n"
     b"\r\n"
@@ -175,5 +175,5 @@ def test_headers_written_in_raw_8_bit_are_read_as_text():
     m = message.parse(RAW_8BIT)
     assert m.subject == "Grüsse"
     assert str(m.from_[0]) == "Jürg Müller <juerg@example.ch>"
-    assert m.to[0].name == "Tobias Würth"
+    assert m.to[0].name == "Lea Müller"
     "".join([m.subject, *map(str, m.from_), *map(str, m.to)]).encode("utf-8")  # no lone surrogates left

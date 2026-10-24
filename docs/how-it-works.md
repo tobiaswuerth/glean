@@ -67,7 +67,7 @@ folder: "Inbox"
 folders: ["Archive", "Inbox"]
 direction: "inbound"
 from: "Hans Müller <hans.mueller@acme.example>"
-to: ["Tobias Würth <tobias@example.com>"]
+to: ["John Doe <john@example.com>"]
 cc: ["Lea Frei <lea.frei@acme.example>"]
 bcc: []
 sender: null
@@ -80,7 +80,7 @@ original: "message.eml"
 sha256: "…"
 ---
 
-Grüezi Herr Würth
+Grüezi Herr Doe
 …
 
 ## Attachments

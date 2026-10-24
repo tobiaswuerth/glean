@@ -11,10 +11,10 @@ def plain(
     *,
     message_id="<CAF1234@mail.acme.example>",
     sender="Hans Müller <hans.mueller@acme.example>",
-    to="Tobias Würth <tobias@example.com>",
+    to="John Doe <john@example.com>",
     subject="Offerte Wartungsvertrag 2027",
     date="Wed, 14 Oct 2026 09:32:00 +0200",
-    body="Grüezi Herr Würth\n\nAnbei die Offerte.\n\nFreundliche Grüsse\nHans Müller\nAcme AG\n",
+    body="Grüezi Herr Doe\n\nAnbei die Offerte.\n\nFreundliche Grüsse\nHans Müller\nAcme AG\n",
     headers=(),
 ):
     m = EmailMessage()
@@ -35,7 +35,7 @@ def with_attachments():
     m = EmailMessage()
     m["Message-ID"] = "<att-1@acme.example>"
     m["From"] = "hans.mueller@acme.example"
-    m["To"] = "tobias@example.com"
+    m["To"] = "john@example.com"
     m["Cc"] = "Lea Frei <lea.frei@acme.example>, info@acme.example"
     m["Subject"] = "Unterlagen"
     m["Date"] = "Thu, 15 Oct 2026 14:05:00 +0200"
@@ -55,7 +55,7 @@ def html_only():
     m = EmailMessage()
     m["Message-ID"] = "<html-1@shop.example>"
     m["From"] = "Shop <news@shop.example>"
-    m["To"] = "tobias@example.com"
+    m["To"] = "john@example.com"
     m["Subject"] = "Newsletter"
     m["Date"] = "Fri, 16 Oct 2026 08:00:00 +0000"
     m["List-Unsubscribe"] = "<mailto:unsubscribe@shop.example>"
@@ -78,7 +78,7 @@ def forwarded():
     outer = EmailMessage()
     outer["Message-ID"] = "<fwd-1@acme.example>"
     outer["From"] = "hans.mueller@acme.example"
-    outer["To"] = "tobias@example.com"
+    outer["To"] = "john@example.com"
     outer["Subject"] = "WG: Termin"
     outer["Date"] = "Tue, 13 Oct 2026 11:00:00 +0200"
     outer.set_content("Siehe unten.\n")
@@ -114,7 +114,7 @@ BROKEN = (
 APPLE_SPLIT = (
     b"Message-ID: <split@example.com>\r\n"
     b"From: a@example.com\r\n"
-    b"To: tobias@example.com\r\n"
+    b"To: john@example.com\r\n"
     b"Subject: Split body\r\n"
     b"Date: Wed, 14 Oct 2026 09:32:00 +0200\r\n"
     b"MIME-Version: 1.0\r\n"

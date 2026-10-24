@@ -8,7 +8,7 @@ from glean.errors import GleanError
 
 MINIMAL = """
 [mail]
-address = "Tobias@Example.com"
+address = "John@Example.com"
 client_id = "11111111-2222-3333-4444-555555555555"
 """
 
@@ -21,8 +21,8 @@ def load(tmp_path, text):
 
 def test_defaults(tmp_path):
     m = load(tmp_path, MINIMAL)
-    assert m.address == "tobias@example.com"
-    assert m.my_addresses == ("tobias@example.com",)
+    assert m.address == "john@example.com"
+    assert m.my_addresses == ("john@example.com",)
     assert (m.host, m.port) == ("outlook.office365.com", 993)
     assert m.authority == options.CONSUMERS
     assert m.redirect_uri == "http://localhost"
@@ -43,14 +43,14 @@ def test_lists_add_to_glean_s_own(tmp_path):
 
 def test_every_setting(tmp_path):
     text = MINIMAL + (
-        'my_addresses = ["T.W@Work.example", "tobias@example.com"]\n'
+        'my_addresses = ["T.W@Work.example", "john@example.com"]\n'
         'authority = "https://login.microsoftonline.com/common"\nredirect_uri = "http://localhost:8400"\n'
         'host = "imap.example.com"\nport = 1993\nfolders = ["Inbox"]\nexclude_folders = ["Spam"]\n'
         'archive = "D:/archive"\ncollection = "post"\nsave_attachments = ["PDF", ".DOCX"]\n'
         'skip_senders = ["Bot@*"]\neml_folder = "saved"\n'
     )
     m = load(tmp_path, text)
-    assert m.my_addresses == ("tobias@example.com", "t.w@work.example")
+    assert m.my_addresses == ("john@example.com", "t.w@work.example")
     assert m.authority.endswith("/common")
     assert m.redirect_uri == "http://localhost:8400"
     assert (m.host, m.port, m.folders) == ("imap.example.com", 1993, ("Inbox",))

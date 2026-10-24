@@ -21,7 +21,7 @@ from .fake_imap import READ_ONLY, FakeImap
 
 
 def connector(tmp_path, extra="", eml=False):
-    text = '[mail]\naddress = "tobias@example.com"\nclient_id = "cid"\narchive = "archive"\n' + extra
+    text = '[mail]\naddress = "john@example.com"\nclient_id = "cid"\narchive = "archive"\n' + extra
     if eml:
         text += 'eml_folder = "eml"\n'
     path = tmp_path / "glean.toml"
@@ -42,7 +42,7 @@ def eml_folder(tmp_path):
     (root / ".hidden").mkdir()
     (root / "a.eml").write_bytes(samples.plain())
     (root / "b.eml").write_bytes(samples.html_only())
-    (root / "Sent" / "c.eml").write_bytes(samples.plain(message_id="<mine@x>", sender="tobias@example.com"))
+    (root / "Sent" / "c.eml").write_bytes(samples.plain(message_id="<mine@x>", sender="john@example.com"))
     (root / "Sent" / "d.eml").write_bytes(samples.plain())  # the same email in another folder
     return root
 
@@ -97,7 +97,7 @@ def test_download_over_imap_reads_only_and_continues_where_it_stopped(tmp_path, 
         }
     )
     mail, _ = connector(tmp_path)
-    monkeypatch.setattr(mail, "mailbox", lambda: imap.Imap("h", 993, "tobias@example.com", lambda: "T", server))
+    monkeypatch.setattr(mail, "mailbox", lambda: imap.Imap("h", 993, "john@example.com", lambda: "T", server))
     report = mail.download(state)
     assert (report.new, report.known) == (2, 1)  # the copy in Sent is known by its Message-ID before fetching
     assert state.find("mail", "caf1234@mail.acme.example").containers == ("Inbox", "Sent")
@@ -155,7 +155,7 @@ def test_a_limited_download_over_imap_keeps_the_cursor_of_a_folder_with_mail_lef
         }
     )
     mail, _ = connector(tmp_path)
-    monkeypatch.setattr(mail, "mailbox", lambda: imap.Imap("h", 993, "tobias@example.com", lambda: "T", server))
+    monkeypatch.setattr(mail, "mailbox", lambda: imap.Imap("h", 993, "john@example.com", lambda: "T", server))
     report = mail.download(state, oldest=2)
     assert (report.new, report.known, report.waiting) == (2, 1, 1)  # Sent's copy of the first doesn't count
     assert state.find("mail", "day1@x").containers == ("Inbox", "Sent")
@@ -170,7 +170,7 @@ def test_a_message_of_unknown_date_comes_after_the_dated_ones_either_way(tmp_pat
                                                              2: samples.plain(message_id="<dated@x>")}}})  # fmt: skip
     server.undated.add(1)
     mail, _ = connector(tmp_path)
-    monkeypatch.setattr(mail, "mailbox", lambda: imap.Imap("h", 993, "tobias@example.com", lambda: "T", server))
+    monkeypatch.setattr(mail, "mailbox", lambda: imap.Imap("h", 993, "john@example.com", lambda: "T", server))
     for which, home in (("oldest", tmp_path / "a"), ("latest", tmp_path / "b")):
         with State(home, {"mail": home / "archive"}, now=lambda: NOW) as state:
             mail.download(state, **{which: 1})
@@ -215,7 +215,7 @@ def test_the_document_of_a_downloaded_email(tmp_path, state):
     assert doc.markdown.parent == doc.original.parent
     assert 'folders: ["Inbox", "Sent"]' in doc.text
     assert "Anbei die Offerte." in doc.text
-    assert doc.addresses == ("hans.mueller@acme.example", "tobias@example.com")  # the interaction names them all
+    assert doc.addresses == ("hans.mueller@acme.example", "john@example.com")  # the interaction names them all
 
 
 def test_instructions_for_the_agent(tmp_path):
@@ -257,9 +257,9 @@ def test_the_instructions_close_what_an_email_settles_and_reuse_a_copys_task(tmp
 
 def test_the_instructions_name_the_owners_addresses(tmp_path):
     # Agents linked the owner by address, or by a name of their own, which orbit's Me.md may not have.
-    mail, _ = connector(tmp_path, 'my_addresses = ["Tobias.Privat@mail.example"]\n')
+    mail, _ = connector(tmp_path, 'my_addresses = ["John.Privat@mail.example"]\n')
     assert (
-        "The owner's addresses are tobias@example.com and tobias.privat@mail.example, and every other address orbit "
+        "The owner's addresses are john@example.com and john.privat@mail.example, and every other address orbit "
         "knows as Me's (`log_interaction` links it as Me, `resolve_entity` returns Me): wherever one appears, that is "
         "Me, orbit's note of the owner"
     ) in " ".join(mail.instructions().split())
@@ -328,32 +328,32 @@ def test_check_reports_the_sign_in(tmp_path, monkeypatch):
     app = FakeApp()
     monkeypatch.setattr(mail, "account", lambda: Mail.account(mail, app))
     assert mail.check() == [(False, "mail: not signed in: run `glean mail login`")]
-    app.accounts.append({"username": "tobias@example.com"})
-    assert mail.check() == [(True, "mail: signed in as tobias@example.com")]
+    app.accounts.append({"username": "john@example.com"})
+    assert mail.check() == [(True, "mail: signed in as john@example.com")]
     app.fail = True
     assert mail.check()[0][0] is False
 
 
 def test_the_imap_mailbox_signs_in_with_the_accounts_token(tmp_path, monkeypatch):
     mail, _ = connector(tmp_path)
-    app = FakeApp([{"username": "tobias@example.com"}], {"access_token": "AT"})
+    app = FakeApp([{"username": "john@example.com"}], {"access_token": "AT"})
     monkeypatch.setattr(mail, "account", lambda: Mail.account(mail, app))
     server = FakeImap({})
     monkeypatch.setattr(imap.imaplib, "IMAP4_SSL", server)
     box = mail.mailbox()
-    assert server.auth == ("XOAUTH2", b"user=tobias@example.com\x01auth=Bearer AT\x01\x01")
+    assert server.auth == ("XOAUTH2", b"user=john@example.com\x01auth=Bearer AT\x01\x01")
     box.close()
 
 
 def test_login_and_logout_commands(tmp_path, monkeypatch, capsys):
     mail, _ = connector(tmp_path)
-    app = FakeApp(result={"access_token": "AT", "id_token_claims": {"preferred_username": "tobias@example.com"}})
+    app = FakeApp(result={"access_token": "AT", "id_token_claims": {"preferred_username": "john@example.com"}})
     monkeypatch.setattr(mail, "account", lambda: Mail.account(mail, app))
     assert Mail.commands["login"].run(mail, SimpleNamespace(device_code=False)) == 0
-    app.accounts.append({"username": "tobias@example.com"})
+    app.accounts.append({"username": "john@example.com"})
     assert Mail.commands["logout"].run(mail, SimpleNamespace()) == 0
     out = capsys.readouterr().out
-    assert "signed in as tobias@example.com" in out
+    assert "signed in as john@example.com" in out
     assert "tokens of 1 account removed" in out
 
 
@@ -374,18 +374,18 @@ class Answers:
 
 def test_setup_asks_for_the_account(tmp_path):
     said = []
-    table = Mail.setup(Answers("Tobias@Example.com", "cid-1", " t@work.example , "), said.append)
+    table = Mail.setup(Answers("John@Example.com", "cid-1", " t@work.example , "), said.append)
     assert "entra.microsoft.com" in said[0]
     path = tmp_path / "glean.toml"
     path.write_text(config.template({"mail": table}), encoding="utf-8")
     m = config.load(path).sources["mail"]
-    assert (m.address, m.client_id) == ("tobias@example.com", "cid-1")
-    assert m.my_addresses == ("tobias@example.com", "t@work.example")
+    assert (m.address, m.client_id) == ("john@example.com", "cid-1")
+    assert m.my_addresses == ("john@example.com", "t@work.example")
 
 
 def test_after_setup_signs_in_when_asked(tmp_path, monkeypatch):
     mail, _ = connector(tmp_path)
-    app = FakeApp(result={"access_token": "AT", "id_token_claims": {"preferred_username": "tobias@example.com"}})
+    app = FakeApp(result={"access_token": "AT", "id_token_claims": {"preferred_username": "john@example.com"}})
     monkeypatch.setattr(mail, "account", lambda: Mail.account(mail, app))
     mail.after_setup(Answers(yes=False))
     assert app.calls == []
@@ -418,7 +418,7 @@ def test_a_message_that_cannot_be_read_is_kept_as_failed(tmp_path, state, monkey
 
 NOTICE = (  # what Exchange and Outlook.com send over IMAP in place of a message they can't convert
     b'MIME-Version: 1.0\r\nContent-Type: text/plain; charset="us-ascii"\r\nFrom: "Microsoft Exchange Server"\r\n'
-    b"To: tobias@example.com\r\nSubject: Retrieval using the IMAP4 protocol failed for the following message: 7\r\n"
+    b"To: john@example.com\r\nSubject: Retrieval using the IMAP4 protocol failed for the following message: 7\r\n"
     b"\r\nThe server couldn't retrieve the following message:\r\n\r\nSubject: Offerte\r\n"
 )
 
@@ -426,7 +426,7 @@ NOTICE = (  # what Exchange and Outlook.com send over IMAP in place of a message
 def test_a_notice_the_server_sent_in_place_of_a_message_is_kept_as_failed(tmp_path, state, monkeypatch):
     server = FakeImap({"Inbox": {"validity": 1, "messages": {7: NOTICE, 8: samples.plain()}}})
     mail, _ = connector(tmp_path)
-    monkeypatch.setattr(mail, "mailbox", lambda: imap.Imap("h", 993, "tobias@example.com", lambda: "T", server))
+    monkeypatch.setattr(mail, "mailbox", lambda: imap.Imap("h", 993, "john@example.com", lambda: "T", server))
     assert mail.download(state).new == 2
     (notice,) = state.items("mail", "failed")
     assert notice.reason == "the mail server sent a notice in its place: it couldn't convert the message for IMAP"
@@ -478,7 +478,7 @@ def test_what_filters_say_goes_to_the_agent_as_evidence(tmp_path, state):
     # A support desk's reply Microsoft rated spam was a person's: filters err, so the agent reads and decides.
     root = tmp_path / "eml"
     (root / "Sent").mkdir(parents=True)
-    (root / "Sent" / "1.eml").write_bytes(samples.plain(message_id="<ask@x>", sender="tobias@example.com",
+    (root / "Sent" / "1.eml").write_bytes(samples.plain(message_id="<ask@x>", sender="john@example.com",
                                                         to="Shop <hello@bags.example>"))  # fmt: skip
     (root / "2.eml").write_bytes(samples.plain(message_id="<answer@x>", sender="Sina <hello@bags.example>",
                                                subject="AW: Ihre Anfrage", headers=JUNK))  # fmt: skip
@@ -503,7 +503,7 @@ def test_what_was_skipped_before_its_sender_became_a_contact_is_let_in(tmp_path,
     skipped = state.find("mail", "answer@x")
     assert (skipped.status, skipped.reason) == ("skipped", "sender: hello@*")
     (root / "Sent").mkdir()
-    (root / "Sent" / "1.eml").write_bytes(samples.plain(message_id="<ask@x>", sender="tobias@example.com",
+    (root / "Sent" / "1.eml").write_bytes(samples.plain(message_id="<ask@x>", sender="john@example.com",
                                                         to="hello@bags.example"))  # fmt: skip
     mail.download(state)
     answer = state.find("mail", "answer@x")
@@ -516,7 +516,7 @@ def test_mail_from_an_address_the_owner_adds_becomes_theirs(tmp_path, state, mon
     # The owner listed five more of their addresses: what they had sent from them stayed inbound, others' mail.
     root = tmp_path / "eml"
     root.mkdir()
-    (root / "1.eml").write_bytes(samples.plain(message_id="<own@x>", sender="Tobias <t@own.example>",
+    (root / "1.eml").write_bytes(samples.plain(message_id="<own@x>", sender="John <t@own.example>",
                                                to="hans@acme.example"))  # fmt: skip
     (root / "2.eml").write_bytes(samples.plain(message_id="<other@x>"))
     skips = 'skip_senders = ["*@own.example"]\n'  # the notices of the owner's own domain
@@ -598,7 +598,7 @@ def test_contacts_are_gathered_from_outbound_mail_downloaded_before(tmp_path, st
     (root / "Sent").mkdir(parents=True)
     for n, to in enumerate(["Hans <hans@acme.example>", "lea@acme.example"]):
         sent = samples.plain(
-            message_id=f"<s{n}@x>", sender="tobias@example.com", to=to, headers=[("Cc", "tobias@example.com")]
+            message_id=f"<s{n}@x>", sender="john@example.com", to=to, headers=[("Cc", "john@example.com")]
         )
         (root / "Sent" / f"{n}.eml").write_bytes(sent)
     mail, _ = connector(tmp_path, eml=True)
@@ -639,7 +639,7 @@ def test_a_document_lists_every_folder_its_email_is_found_in(tmp_path, state, mo
 def test_contacts_known_already_are_not_gathered_again(tmp_path, state, monkeypatch):
     root = tmp_path / "eml"
     (root / "Sent").mkdir(parents=True)
-    (root / "Sent" / "1.eml").write_bytes(samples.plain(message_id="<s@x>", sender="tobias@example.com",
+    (root / "Sent" / "1.eml").write_bytes(samples.plain(message_id="<s@x>", sender="john@example.com",
                                                         to="hans@acme.example"))  # fmt: skip
     mail, _ = connector(tmp_path, eml=True)
     mail.download(state)
@@ -659,14 +659,14 @@ def test_what_an_email_shares_with_others_it_must_not_run_beside(tmp_path, state
     assert "domain:acme.example" in offer
     assert "thread:caf1234@mail.acme.example" in offer  # its own id: it starts the thread
     assert "thread:first@x.example" in reply  # the first of its references
-    assert not any("tobias@example.com" in key for key in offer | reply)  # the owner is in everything
+    assert not any("john@example.com" in key for key in offer | reply)  # the owner is in everything
     mine = mail.document(state.find("mail", "mine@x")).related  # from the owner to the owner
     assert mine == {"thread:mine@x"}
 
 
 def test_free_mail_domains_relate_no_one():
-    m = mail_message.parse(samples.plain(sender="Anna <anna@gmail.com>", to="tobias@example.com"))
-    keys = Mail.related(m, ("tobias@example.com",))
+    m = mail_message.parse(samples.plain(sender="Anna <anna@gmail.com>", to="john@example.com"))
+    keys = Mail.related(m, ("john@example.com",))
     assert "address:anna@gmail.com" in keys
     assert not any(key.startswith("domain:") for key in keys)
 
