@@ -18,6 +18,8 @@ from .errors import GleanError
 
 WAIT_SECONDS = 0.5  # how often the main thread looks up from the runs, so that Ctrl+C is heard
 MAX_ITEM_CHARS = 400_000  # of an item, sent to the agent (~100k tokens); the whole is in its Markdown file
+HISTORY_EXAMPLES = 2  # of each verdict on a sender's earlier items, the latest a run hears of
+EXAMPLE_CHARS = 100  # of each such example, a title or a reason
 TROUBLE_WINDOW = 10  # the last runs the circuit breaker looks at
 TROUBLE_LIMIT = 6  # how many of them going wrong (failed, work left undone, calls refused) stop the batch
 
@@ -103,9 +105,9 @@ def system_prompt(cfg, connector, names=None):
     return template
 
 
-def message(connector, item, document, last_outcome=None):
-    """What the agent gets on stdin: where the item's files are, then the item itself between two marker lines that
-    its text can't contain."""
+def message(connector, item, document, last_outcome=None, history=None):
+    """What the agent gets on stdin: where the item's files are, what is known about it and its sender (`history`, as
+    sender_history gives it), then the item itself between two marker lines that its text can't contain."""
     marker = f"item-{secrets.token_hex(6)}"
     while marker in document.text:  # pragma: no cover (a random marker in the text: practically never)
         marker = f"item-{secrets.token_hex(6)}"
@@ -120,6 +122,8 @@ def message(connector, item, document, last_outcome=None):
         lines.append("- Files saved with it, for sift: " + "; ".join(str(p) for p in document.files))
     if document.signals:
         lines.append("- What its headers and sender say, as evidence, not a verdict: " + "; ".join(document.signals))
+    if said := _history_line(connector.noun, history):
+        lines.append(said)
     if item.status == "skipped":
         lines.append(
             f"- It was included on purpose, though skipped before ({item.reason}): if it concerns an organization in "
@@ -168,7 +172,7 @@ def run(cfg, connector, state, agent, items, say=console.say, out=print, dry_run
             counts["failed"] = counts.get("failed", 0) + 1
             continue
         if dry_run:
-            out(message(connector, item, document, _last_outcome(state, item)))
+            out(message(connector, item, document, _last_outcome(state, item), sender_history(state, connector, item)))
         else:
             entries.append((item, document))
     if entries:
@@ -189,7 +193,8 @@ def _import(connector, state, agent, prompt, entries, parallel, counts, say, out
                     say(f"[{started}/{len(entries)}] {_label(item)}")
                     own = archive.run_folder(connector.home, connector.archive, item.path)
                     own.mkdir(parents=True, exist_ok=True)
-                    text = message(connector, item, document, _last_outcome(state, item))
+                    history = sender_history(state, connector, item)
+                    text = message(connector, item, document, _last_outcome(state, item), history)
                     run = state.start_run(item)
                     future = pool.submit(agent.run, prompt, text, own / "transcript.jsonl", document.addresses)
                     running[future] = ((item, document), run, own)
@@ -267,6 +272,57 @@ def _stopped(state, item, run, error):
 
 def _label(item):
     return f"{item.id}  {item.date[:10]}  {item.title or '(no title)'}"
+
+
+def sender_history(state, connector, item):
+    """How runs judged the earlier items from the item's sender, and from the others of its group: {"sender":
+    {verdict: [example, …]}, "group": {…}, "name": the group}, the latest first; None for the owner's own items and
+    those of no known sender."""
+    sender, group = connector.sender(item.author)
+    if item.direction == "outbound" or not sender:
+        return None
+    found = {"sender": {}, "group": {}, "name": group}
+    for author, title, status, reason in state.judged(item, group or sender):
+        theirs, their_group = connector.sender(author)
+        which = "sender" if theirs == sender else "group" if group and their_group == group else None
+        if which:
+            verdict, example = _verdict(status, reason, title)
+            found[which].setdefault(verdict, []).append(example)
+    return found
+
+
+def _verdict(status, reason, title):
+    """A run's verdict and what shows it: an import's title, a skip's reason."""
+    if status == "done":
+        return "imported", title
+    kind, _, why = (reason or "").removeprefix("agent: ").partition(": ")
+    return ("spam", why) if kind == "spam" else ("skipped", why or reason or "")
+
+
+def _history_line(noun, history):
+    """The message's line on a sender's history, or None if there is none."""
+    if not history:
+        return None
+    mine, theirs = _tally(history["sender"]), _tally(history["group"])
+    if mine and theirs:
+        return (f"- How earlier {noun}s from its sender went, evidence about the sender, not about this one: {mine}. "
+                f"From others at {history['name']}: {theirs}.")  # fmt: skip
+    if mine:
+        return f"- How earlier {noun}s from its sender went, evidence about the sender, not about this one: {mine}."
+    if theirs:
+        return (f"- How earlier {noun}s from others at {history['name']} went, evidence about them, not about this "
+                f"one: {theirs}.")  # fmt: skip
+    return None
+
+
+def _tally(verdicts):
+    """'1 imported (Re: Offer); 2 skipped (a newsletter)': each verdict's count and its latest distinct examples."""
+    parts = []
+    for verdict in ("imported", "skipped", "spam"):
+        if examples := verdicts.get(verdict):
+            shown = list(dict.fromkeys(e[:EXAMPLE_CHARS] for e in examples if e))[:HISTORY_EXAMPLES]
+            parts.append(f"{len(examples)} {verdict}" + (f" ({'; '.join(shown)})" if shown else ""))
+    return "; ".join(parts)
 
 
 def _last_outcome(state, item):

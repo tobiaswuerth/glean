@@ -117,6 +117,14 @@ class Mail(Connector):
     def key(self, text):
         return message.normalize_id(text) or text
 
+    def sender(self, author):
+        """The first address of an email's From, and its domain unless that is a free-mail domain."""
+        found = [a.casefold() for _, a in email.utils.getaddresses([author or ""]) if "@" in a]
+        if not found:
+            return None, None
+        domain = found[0].rpartition("@")[2]
+        return found[0], None if domain in FREE_MAIL else domain
+
     def check(self):
         if self.config.eml_folder is not None:
             ok = self.config.eml_folder.is_dir()

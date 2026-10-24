@@ -83,6 +83,11 @@ class Connector(ABC):
         """An item's key as written by a person, as the state database stores it."""
         return text
 
+    def sender(self, author):
+        """Who wrote an item, and the group they are of (an organization's domain), as keys that tell whether two
+        items' authors are one sender or of one group; None for what it can't tell."""
+        return author.strip().casefold() or None, None
+
     def upgrade(self, state):  # noqa: B027 (optional)
         """Bring what an older glean stored in line with this version, such as items its rules judged otherwise;
         called before each download, list and run, so it should do its work once per version."""

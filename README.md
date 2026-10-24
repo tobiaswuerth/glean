@@ -28,10 +28,10 @@ updates people, organizations and tasks, and makes the item searchable. Neither 
   is stopped before it acts. Items are treated as data, never as instructions
   ([how](https://github.com/tobiaswuerth/glean/blob/main/docs/how-it-works.md#the-agent-run)).
 - **Spam and mass mail stay out, judged by the agent.** What Outlook.com's filters and the headers say (spam and bulk
-  ratings, mailing-list headers, no-reply senders, whether you wrote to the sender) goes to the agent as evidence, not
-  as rules, since rules skipped people too; it skips automated mail and spam without a tool call, for about $0.002
-  with Haiku, except mail that settles a fact about you (a registration, an admission, a service that starts or
-  ends), which goes on your note. Only senders you list are skipped without a run.
+  ratings, mailing-list headers, no-reply senders, whether you wrote to the sender, how earlier mail from the sender was
+  judged) goes to the agent as evidence, not as rules, since rules skipped people too; it skips automated mail and spam
+  without a tool call, for about $0.002 with Haiku, except mail that settles a fact about you (a registration, an
+  admission, a service that starts or ends), which goes on your note. Only senders you list are skipped without a run.
 - **Runs that leave work undone are sent back.** glean checks each import's tool calls: the interaction logged,
   every unknown person and organization taken up, sift asked to index, no failed call dropped. What is left goes back
   to the agent in the same session, up to twice, and into the report. A batch whose runs keep going wrong stops.
