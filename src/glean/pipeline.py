@@ -244,10 +244,12 @@ def _fenced(connector, document, lines, most, kind):
 
 
 def wanted(item):
-    """Why an item is imported without a first look: the owner or a review asked for it, or the owner included it
-    though it was skipped; None if it gets one."""
+    """Why an item is imported without a first look: the owner or a review asked for it, the owner wrote it, or the
+    owner included it though it was skipped; None if it gets one."""
     if item.wanted:
         return f"asked for by {_one_line(item.wanted)}"
+    if item.direction == "outbound":
+        return "the owner wrote it: what they write is recorded, however short"
     if item.status == "skipped":
         return (
             f"the owner included it on purpose, though it was skipped before ({_one_line(item.reason)}): if it "

@@ -17,6 +17,8 @@ A first look decides, a stronger model imports, and the reviews run alongside an
   the sender's history as evidence; its prompt is `prompts/triage.md` and the connector's `triage.md`. What it judges
   worth it goes to the import, by `[agent] import_model` (new, Sonnet by default), which knows why and may still call
   it skipped or spam where that is plain. The item's cost, turns and report count both runs.
+- What the owner wrote is imported without a first look: one skipped the owner's one-word note to a friend, with a
+  file, as nothing lasting. The import still skips the owner's tests to themselves.
 - An item reset by the owner (`glean mail reset`) or named by a review to import again is imported without a first
   look, with why: a review's `reimport` now names why for each, and runs.db keeps it (`outcomes.wanted`, schema 2;
   glean 0.12's runs.db gains it when first opened, and an older glean then refuses it).

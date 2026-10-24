@@ -544,6 +544,25 @@ def test_an_item_asked_for_or_included_on_purpose_is_imported_without_a_first_lo
     assert state.find("notes", "a").wanted is None  # done: wanted no more
 
 
+def test_what_the_owner_wrote_is_imported_without_a_first_look(setup):
+    # A first look skipped the owner's "Yo" to a friend, with a file, as nothing lasting; what they write is recorded.
+    cfg, notes, state = setup
+    item = dataclasses.replace(state.find("notes", "a"), direction="outbound")
+    look, importer = looks(), FakeAgent()
+    pipeline.run(cfg, notes, state, runners(importer, look), [item], print, print)
+    assert look.runs == []
+    assert "- Why it is here: the owner wrote it: what they write is recorded, however short" in importer.runs[0][1]
+
+
+def test_the_import_skips_the_owner_s_tests_to_themselves(setup):
+    cfg, notes, _ = setup
+    prompt = " ".join(pipeline.system_prompt(cfg, notes).split())
+    assert (
+        "a notice that settles nothing), the owner's test to themselves or a test address, with nothing to say"
+        in prompt
+    )
+
+
 def test_a_dry_run_of_an_item_asked_for_shows_its_import(setup):
     cfg, notes, state = setup
     item, out = state.reset(state.find("notes", "a"), "the owner"), []

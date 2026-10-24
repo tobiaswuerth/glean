@@ -32,7 +32,7 @@ updates people, organizations and tasks, and makes the item searchable. Neither 
   senders, whether you wrote to the sender, how earlier mail from the sender was judged) goes to it as evidence, not as
   rules, since rules skipped people too. It skips automated mail and spam, for about a fifth of a cent each, except mail
   that settles a fact about you (a registration, an admission, a service that starts or ends), which goes on your note.
-  What it judges worth recording, Sonnet imports. Only senders you list are skipped without a run.
+  What you wrote, and what it judges worth recording, Sonnet imports. Only senders you list are skipped without a run.
 - **Runs that leave work undone are sent back.** glean checks each import's tool calls: the interaction logged,
   every unknown person and organization taken up, sift asked to index, no failed call dropped. What is left goes back
   to the agent in the same session, up to twice, and into the report. A batch whose runs keep going wrong stops.

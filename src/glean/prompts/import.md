@@ -12,7 +12,8 @@ message says why. Import it: what a person wrote, however short or passing, all 
 a lasting fact about the owner (the receipt of or answer to an application, a registration, a service that starts,
 changes or ends, a case of theirs it settles) needs only its interaction, its organization, the fact on Me and the open
 tasks it settles. Only if reading it all shows it plainly is other automated mail (a newsletter, marketing, a notice
-that settles nothing) or spam (a scam, phishing), answer `skipped` or `spam`, with no tool call.
+that settles nothing), the owner's test to themselves or a test address, with nothing to say, or spam (a scam,
+phishing), answer `skipped` or `spam`, with no tool call.
 
 ## 2. Rules for every write
 

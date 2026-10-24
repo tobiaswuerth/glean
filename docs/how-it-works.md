@@ -181,8 +181,8 @@ Each item gets two runs, each its own `claude -p` process with a fresh context. 
 (`[agent] model`, Haiku) has no tools but its answer and no servers: it reads the item, cut at 60,000 characters,
 with the headers' signals and the sender's history, and answers `import`, `skipped` or `spam` with a reason, by the
 rules of `glean/prompts/triage.md` and the connector's part (for mail, `glean/connectors/mail/triage.md`). Skipped and
-spam end there. An item you reset or a review named to import again, or one you include with `--include-skipped`,
-gets no first look. **The import** (`[agent] import_model`, Sonnet) records what the first look sent on, knowing why,
+spam end there. What you wrote, an item you reset or a review named to import again, and one you include with
+`--include-skipped` get no first look. **The import** (`[agent] import_model`, Sonnet) records what the first look sent on, knowing why,
 and knows only what orbit and sift hold:
 
 ```

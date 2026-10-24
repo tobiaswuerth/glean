@@ -103,7 +103,9 @@ def test_the_whole_flow(mail_home, capsys):
     code, out, _ = run(capsys, "status", "--json")
     status = json.loads(out)
     assert sum(status["sources"]["mail"]["items"].values()) == 4
-    assert status["sources"]["mail"]["cost_usd"] == pytest.approx(0.48)  # a first look and an import each
+    assert status["sources"]["mail"]["cost_usd"] == pytest.approx(
+        0.36
+    )  # a first look and an import, the owner's no look
 
 
 def test_a_download_takes_one_count_above_zero(mail_home, capsys):
@@ -139,7 +141,7 @@ def test_a_dry_run(mail_home, capsys):
     run(capsys, "mail", "download")
     code, out, _ = run(capsys, "mail", "run", "--latest", "1", "--dry-run")
     assert code == 0
-    assert "Here is the next email." in out
+    assert "Here is the next email to record in orbit and sift." in out  # the owner's own: no first look
     assert run(capsys, "mail", "list")[1].count("\n") == 3  # still waiting
 
 
