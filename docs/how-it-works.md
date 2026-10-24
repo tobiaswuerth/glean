@@ -128,8 +128,12 @@ glean 0.12 gains `wanted` when glean 0.13 first opens it; an older glean then re
 
 Items an older glean downloaded are brought in line with this version before the next download, run or list, once
 per version: what its own rules skipped is new again, for the agent to judge, and what lacks a document gets one;
-items an agent ran on keep their status. A home of glean 0.3 or older, with everything in
-one `state.db`, isn't read: glean says so, and a new home starts with a new download.
+items an agent ran on keep their status. When the owner's addresses (`my_addresses`) change, the mail downloaded
+before is brought in line once: what its original's From shows was sent from an address added is the owner's
+(outbound), its recipients contacts and no skip rule setting it aside, and its document says so; what was sent from
+one taken out is someone else's again. Only mail whose From names an owner's address, or that counted as theirs, is
+read; a stop midway is made good the next time. A home of glean 0.3 or older, with everything in one `state.db`,
+isn't read: glean says so, and a new home starts with a new download.
 
 orbit is the second safety net: `log_interaction` returns the existing note for a Message-ID it knows, so an email
 imported twice is still one interaction. A retry tells the agent so, and it completes what is missing.

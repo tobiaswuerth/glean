@@ -333,6 +333,22 @@ def test_an_items_places_are_found_by_index(state):
     assert any("USING" in row[-1] and "INDEX" in row[-1] for row in plan)
 
 
+def test_reading_many_items_reads_their_places_at_once(state):
+    # A query per item made every download's and upgrade's pass over a large mailbox slow.
+    for n in range(30):
+        added = state.add(item(f"m{n}@x"), "Inbox", str(n))
+        state.locate(added, "Archive", str(n))
+    queries = []
+    state.db.set_trace_callback(queries.append)
+    try:
+        found = state.items("mail")
+        waiting = state.pending("mail", 5)
+    finally:
+        state.db.set_trace_callback(None)
+    assert len(queries) <= 4
+    assert {i.containers for i in found + waiting} == {("Archive", "Inbox")}
+
+
 def test_marks_are_kept_per_source_and_name(state):
     assert state.mark("mail", "rules") is None
     state.set_mark("mail", "rules", "2")

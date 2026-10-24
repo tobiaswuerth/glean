@@ -20,7 +20,12 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 - Mail downloaded before from an address the owner adds to `my_addresses` becomes theirs, once: outbound, its
   recipients contacts, set aside by no skip rule, and its document says so; mail from an address taken out is someone
-  else's again. It stayed as it was downloaded.
+  else's again. It stayed as it was downloaded. Who wrote it is read from its original's From, never from a display
+  name, and a stop midway is made good the next time.
+- Reading many items (each download's and upgrade's pass over the mailbox) reads their folders in one query, not one
+  per item.
+- An experiment's servers are ended even when one doesn't stop on its own; `.gitignore` keeps a glean home in the
+  repository's own folder out of git.
 
 ## [0.13.0] - 2026-10-24
 

@@ -61,7 +61,12 @@ def serving(root, vault, orbit, port, sift_port):
     finally:
         for server in started:
             server.terminate()
-            server.wait(timeout=10)
+        for server in started:
+            try:
+                server.wait(timeout=10)
+            except subprocess.TimeoutExpired:  # a server that doesn't end on its own is ended
+                server.kill()
+                server.wait()
 
 
 def main():

@@ -260,7 +260,8 @@ def test_the_instructions_name_the_owners_addresses(tmp_path):
     mail, _ = connector(tmp_path, 'my_addresses = ["Tobias.Privat@mail.example"]\n')
     assert (
         "The owner's addresses are tobias@example.com and tobias.privat@mail.example, and every other address orbit "
-        "resolves to Me: wherever one appears, that is Me, orbit's note of the owner"
+        "knows as Me's (`log_interaction` links it as Me, `resolve_entity` returns Me): wherever one appears, that is "
+        "Me, orbit's note of the owner"
     ) in " ".join(mail.instructions().split())
 
 
@@ -275,7 +276,8 @@ def test_the_instructions_leave_a_shared_mailbox_off_the_person_who_signs(tmp_pa
 def test_the_instructions_make_one_task_of_a_day_s_vacancies_from_one_sender(tmp_path):
     # A recruiter sent 24 vacancies in a day; each became a task to answer, which a review then cancelled.
     text = " ".join(connector(tmp_path)[0].instructions().split())
-    assert "Vacancies or offers someone proposes unasked (a recruiter's list, one per email)" in text
+    assert "but for one case: vacancies or offers someone proposes unasked (a recruiter's list, one per email)" in text
+    assert "make one task per sender and day (the email's)" in text
 
 
 def test_a_sender_is_its_address_and_its_organization_s_domain(tmp_path):
@@ -539,6 +541,37 @@ def test_mail_from_an_address_the_owner_adds_becomes_theirs(tmp_path, state, mon
     assert (own.direction, own.status) == ("inbound", "skipped")  # someone else's, as the rule says
 
 
+def test_the_owner_s_address_counts_as_their_mail_carries_it_not_as_its_display_name_spells_it(tmp_path, state):
+    # Outlook writes "t@own.example <t@own.example>"; read from the stored author, such mail turned inbound, and a
+    # name holding the owner's address must not make a stranger's mail theirs.
+    root = tmp_path / "eml"
+    root.mkdir()
+    (root / "1.eml").write_bytes(samples.plain(message_id="<own@x>", sender='"t@own.example" <t@own.example>'))
+    (root / "2.eml").write_bytes(samples.plain(message_id="<spoof@x>", sender='"t@own.example" <x@evil.example>'))
+    mail, _ = connector(tmp_path, eml=True)
+    mail.download(state)
+    mail, _ = connector(tmp_path, 'my_addresses = ["t@own.example"]\n', eml=True)
+    mail.upgrade(state)
+    assert (state.find("mail", "own@x").direction, state.find("mail", "spoof@x").direction) == ("outbound", "inbound")
+
+
+def test_an_upgrade_stopped_midway_is_done_in_full_next_time(tmp_path, state, monkeypatch):
+    root = tmp_path / "eml"
+    root.mkdir()
+    (root / "1.eml").write_bytes(samples.plain(message_id="<own@x>", sender="t@own.example", to="hans@acme.example"))
+    mail, _ = connector(tmp_path, eml=True)
+    mail.download(state)
+    mail, _ = connector(tmp_path, 'my_addresses = ["t@own.example"]\n', eml=True)
+    monkeypatch.setattr(mail, "_write_document", lambda *a: (_ for _ in ()).throw(KeyboardInterrupt))
+    with pytest.raises(KeyboardInterrupt):
+        mail.upgrade(state)
+    monkeypatch.undo()
+    mail.upgrade(state)
+    own = state.find("mail", "own@x")
+    assert own.direction == "outbound"
+    assert 'direction: "outbound"' in (mail.archive / own.document).read_text(encoding="utf-8")
+
+
 def test_an_email_already_imported_keeps_its_status_when_its_direction_changes(tmp_path, state):
     root = tmp_path / "eml"
     root.mkdir()
@@ -550,13 +583,13 @@ def test_an_email_already_imported_keeps_its_status_when_its_direction_changes(t
         run = state.start_run(state.find("mail", f"{key}@x"))
         state.finish_run(run, state.find("mail", f"{key}@x"), status="done", outcome="success", cost_usd=0, turns=1,
                          duration_ms=1)  # fmt: skip
-    (mail.archive / state.find("mail", "gone@x").path).unlink()  # an original gone: its direction still changes
+    (mail.archive / state.find("mail", "gone@x").path).unlink()  # an original gone: who wrote it can't be read
     state.set_document(state.find("mail", "bare@x"), None)  # as glean 0.3 left mail: no document yet
     mail, _ = connector(tmp_path, 'my_addresses = ["t@own.example"]\n', eml=True)
     mail.upgrade(state)
     found = {key: state.find("mail", f"{key}@x") for key in ("done", "gone", "bare")}
     assert {key: (i.direction, i.status) for key, i in found.items()} == {
-        "done": ("outbound", "done"), "gone": ("outbound", "done"), "bare": ("outbound", "new")}  # fmt: skip
+        "done": ("outbound", "done"), "gone": ("inbound", "done"), "bare": ("outbound", "new")}  # fmt: skip
     assert 'direction: "outbound"' in (mail.archive / found["done"].document).read_text(encoding="utf-8")
 
 
