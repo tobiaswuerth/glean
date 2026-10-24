@@ -331,10 +331,12 @@ def _last_outcome(state, item):
 
 
 def _status(result):
-    """An item's status after its run, and why it has it: failed with the run's error; skipped when the agent judged
-    it automated mail or spam, with its reason; else done."""
+    """An item's status after its run, and why it has it: failed with the run's error, or when no answer came; skipped
+    when the agent judged it automated mail or spam, with its reason; else done."""
     if not result.ok:
         return "failed", result.reason
+    if result.verdict is None:  # never taken as imported: its words may have said otherwise
+        return "failed", "the agent gave no answer"
     if result.verdict in ("skipped", "spam"):
         return "skipped", f"agent: {result.verdict}: {result.summary or 'no reason given'}"
     return "done", None

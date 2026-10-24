@@ -118,7 +118,7 @@ def answer(spec, mode, n):
     given = {"outcome": verdict, "reason": spec.get("reason", "a reply about the offer"), "report": report}
     event = {"type": "result", "subtype": "success", "is_error": False, "result": json.dumps(given), "num_turns": 7,
              "total_cost_usd": round(0.12 * (n + 1), 2), "duration_ms": 4321, "permission_denials": denied}  # fmt: skip
-    if mode != "unstructured":
+    if mode != "unstructured" and not (mode == "unstructured_once" and n == 0):
         event["structured_output"] = given
     else:
         event["result"] = report
