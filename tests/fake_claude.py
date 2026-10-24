@@ -29,6 +29,7 @@ OTHERS = [
     "mcp__orbit__link_by_domain",
     "mcp__orbit__lint_vault",
     "mcp__orbit__settle_review",
+    "mcp__orbit__retract_observation",
     "mcp__sift__vsearch",
     "mcp__sift__get",
 ]
@@ -75,7 +76,7 @@ def main():
     if mode == "missing":
         tools = [t for t in tools if t != "mcp__orbit__propose_review"]
     if mode == "old_orbit":
-        tools = [t for t in tools if t != "mcp__orbit__settle_review"]
+        tools = [t for t in tools if t != "mcp__orbit__retract_observation"]
     servers = [{"name": name, "status": "connected"} for name in configured]
     for server in servers:
         if mode == "offline" and server["name"] == "sift":

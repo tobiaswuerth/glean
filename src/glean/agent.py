@@ -46,6 +46,7 @@ REVIEW_TOOLS = (
     "link_by_domain",
     "lint_vault",
     "settle_review",
+    "retract_observation",
 )  # a review fixes what imports wrote and acts on the owner's answers; it records no new interactions or tasks
 SERVERS = ("orbit", "sift")
 ANSWER = "StructuredOutput"  # the tool Claude Code gives a run whose answer has a schema; it changes nothing
@@ -171,7 +172,8 @@ POLICY = "anthropic.com/legal/aup"  # in the text of a result the model's usage 
 
 @dataclass
 class Result:
-    outcome: str  # success, error_max_turns, error_max_budget_usd, error_during_execution, timeout, refused, crashed
+    outcome: str  # success, error_max_turns, error_max_budget_usd, error_during_execution, timeout, refused, crashed,
+    # policy_refusal, stopped (never began)
     ok: bool
     report: str = ""
     reason: str | None = None
@@ -234,12 +236,15 @@ class Agent:
         self.base = command or [str(find_claude(cfg.agent.claude))]  # tests run a fake claude here
         self.disallowed = None  # the servers' other tools, known after prepare()
         self.live, self.lock = set(), threading.Lock()  # the processes running, which stop() ends
+        self.stopped = False  # once stopped, no run starts
         self.check = role.check  # what an answer leaves to do: it goes back
         self.orbit_url = endpoint(cfg.orbit_url, role.orbit) if role.orbit else None
 
     def stop(self):
-        """End every run in progress, as Ctrl+C does with several at once: each then ends without a result."""
+        """End every run in progress, as Ctrl+C does with several at once: each then ends without a result; and start
+        no other."""
         with self.lock:
+            self.stopped = True
             running = list(self.live)
         for proc in running:
             with suppress(OSError):
@@ -331,6 +336,9 @@ class Agent:
         timeout, or (until_init) its first event. An answer in which `check` finds things left to do goes back to the
         run, in the same session, as a message that lists them, at most FOLLOWUPS times. Returns ({"init": …,
         "error": …}, Result)."""
+        with self.lock:
+            if self.stopped:
+                return {}, Result("stopped", False, reason="glean stopped the batch before this run began")
         log = Path(transcript).open("ab") if transcript else None  # noqa: SIM115 (closed below, after the loop)
         try:
             proc = self.popen(cmd, cwd=cwd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -340,6 +348,9 @@ class Agent:
             raise GleanError(f"can't start Claude Code ({cmd[0]}): {e}") from None
         with self.lock:
             self.live.add(proc)
+            if self.stopped:  # stopped while it started
+                with suppress(OSError):
+                    proc.kill()
         lines, errors = queue.Queue(), []
         threads = [
             threading.Thread(target=_send, args=(proc.stdin, message), daemon=True),

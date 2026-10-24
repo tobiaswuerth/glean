@@ -31,14 +31,16 @@ Start with `link_by_domain`, once: it links people without an organization to th
    the owner: under `reimport`, with why; it is imported again without a first look. So too an import that recorded
    clearly wrong things, once you have undone what you can. One imported that is automated mail and settles no lasting
    fact about the owner (an application, a registration, a service that starts or ends): undo what it recorded that
-   isn't so, and say so in the report.
+   isn't so (`retract_observation`, `update_task`), and say so in the report.
 4. **Misplaced facts**: a task with the wrong owner or status, an observation or field on the wrong note (a fact about
    the owner belongs on Me), a relation that isn't so, a note named after an address handle, a misspelling or how the
    address spells the name where {noun}s show how the person writes it (hansmueller, Mueller: Hans Müller):
    `rename_entity` it to the name the {noun}s give; for a note named after an address handle, search sift for its
-   address first (another {noun}, a CC list or a newsletter often names the person). Fix what the digests and notes show
-   beyond doubt (`update_task`, `set_fields`, `link_entities`), with `source` "glean review, {date}"; what you can't
-   verify, ask the owner if it matters, else name it in the report.
+   address first (another {noun}, a CC list or a newsletter often names the person). An observation that isn't so, or
+   sits on the wrong note: `retract_observation` it, then `add_observation` it where it belongs, with its {noun}'s
+   interaction as `source`. Fix what the digests, notes and {noun}s show beyond doubt (`update_task`, `set_fields`,
+   `link_entities`), with `source` "glean review, {date}"; what you can't verify, ask the owner if it matters, else name
+   it in the report.
 5. **Tasks a later {noun} settled**: an open or waiting task whose answer, delivery or end a later digest shows (the
    refund came, the case was closed): `update_task` it done or cancelled.
 6. **What only the owner can tell**, as open questions (`propose_review` of kind `question`): who a person is to the

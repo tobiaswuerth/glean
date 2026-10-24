@@ -51,6 +51,7 @@ def test_prepare_learns_which_tools_to_hide(tmp_path, fake):
             "mcp__orbit__link_by_domain",
             "mcp__orbit__lint_vault",
             "mcp__orbit__settle_review",
+            "mcp__orbit__retract_observation",
             "mcp__sift__vsearch",
             "mcp__sift__get",
         ]
@@ -108,6 +109,7 @@ def test_a_review_run_has_orbit_s_upkeep_its_own_answer_model_and_limits(tmp_pat
     assert "mcp__orbit__settle_review" in allowed  # it acts on the owner's answers
     assert "mcp__orbit__log_interaction" not in allowed
     assert "mcp__sift__get" in allowed  # it reads an email it doubts
+    assert "mcp__orbit__retract_observation" in allowed  # and takes back a wrong fact
     assert json.loads(args[args.index("--json-schema") + 1]) == agent.REVIEW.schema
     assert (args[args.index("--model") + 1], args[args.index("--max-turns") + 1]) == ("opus", "90")
     assert args[args.index("--max-budget-usd") + 1] == "5.0"
@@ -464,6 +466,33 @@ def test_an_answer_given_when_asked_again_counts(tmp_path, fake):
     fake("unstructured_once")
     result = make(tmp_path).run("p", "m")
     assert (result.verdict, result.followups, result.checks) == ("imported", 1, [])
+
+
+def test_a_run_asked_for_after_a_stop_never_starts(tmp_path, fake):
+    # Ctrl+C came as a first look ended: the import it then started ran on, for minutes, unkilled.
+    starts = fake()
+    a = make(tmp_path)
+    a.prepare()
+    a.stop()
+    result = a.run("p", "m")
+    assert (result.ok, result.outcome, len(starts())) == (False, "stopped", 1)  # the probe alone started
+
+
+def test_a_run_stopped_while_it_starts_is_ended(tmp_path, fake):
+    fake("hang")
+    made = []
+
+    def popen(*args, **kwargs):
+        proc = subprocess.Popen(*args, **kwargs)
+        made[0].stop()  # between the start and glean's record of it
+        return proc
+
+    a = agent.Agent(cfg(tmp_path), command=[sys.executable, FAKE], popen=popen)
+    made.append(a)
+    a.disallowed = []  # prepared
+    started = time.monotonic()
+    assert a.run("p", "m").outcome == "crashed"  # ended without a result
+    assert time.monotonic() - started < 30  # not after the hang
 
 
 def test_stop_ends_every_run_in_progress(tmp_path, fake):

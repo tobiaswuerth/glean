@@ -23,7 +23,7 @@ max_turns = 60           # per item
 timeout_minutes = 5      # per item
 max_budget_usd = 1.0     # per item; 0: no limit
 parallel = 1             # agent runs at once; related items go one after the other while others can run
-review_every = 100       # after a run, one review of every this many imports, which fixes what they wrote; 0: none
+review_every = 100       # during a run, a review of each this many items, which fixes what they wrote; 0: none
 review_model = "opus"    # the model of the review: one run of it for many of the imports' model
 
 [orbit]
@@ -148,7 +148,7 @@ class Agent:
     timeout_minutes: float = 5
     max_budget_usd: float | None = 1.0
     parallel: int = 1
-    review_every: int = 100  # imports per review; 0: no review
+    review_every: int = 100  # items per review; 0: no review
     review_model: str = "opus"
 
 

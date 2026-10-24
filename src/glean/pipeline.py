@@ -22,6 +22,7 @@ from .errors import GleanError
 WAIT_SECONDS = 0.5  # how often the main thread looks up from the runs, so that Ctrl+C is heard
 MAX_ITEM_CHARS = 400_000  # of an item, sent to its import (~100k tokens); the whole is in its Markdown file
 LOOK_CHARS = 60_000  # of an item, sent to its first look, which decides by how it starts (~15k tokens)
+WHY_CHARS = 200  # of a reason the import hears, which a model wrote from the item's text: one line, cut
 HISTORY_EXAMPLES = 2  # of each verdict on a sender's earlier items, the latest a run hears of
 EXAMPLE_CHARS = 100  # of each such example, a title or a reason
 TROUBLE_WINDOW = 10  # the last runs the circuit breaker looks at
@@ -246,13 +247,20 @@ def wanted(item):
     """Why an item is imported without a first look: the owner or a review asked for it, or the owner included it
     though it was skipped; None if it gets one."""
     if item.wanted:
-        return f"asked for by {item.wanted}"
+        return f"asked for by {_one_line(item.wanted)}"
     if item.status == "skipped":
         return (
-            f"the owner included it on purpose, though it was skipped before ({item.reason}): if it concerns an "
-            'organization in orbit, log it as kind "automated" with that organization; else answer `skipped`.'
+            f"the owner included it on purpose, though it was skipped before ({_one_line(item.reason)}): if it "
+            'concerns an organization in orbit, log it as kind "automated" with that organization; else answer '
+            "`skipped`."
         )
     return None
+
+
+def _one_line(text, most=WHY_CHARS):
+    """Text a model wrote, as one line of at most `most` characters: it can't start lines of its own."""
+    said = " ".join((text or "").split())
+    return said if len(said) <= most else said[: most - 1] + "…"
 
 
 def run(cfg, connector, state, runners, items, say=console.say, out=print, dry_run=False, names=None, parallel=1):
@@ -297,7 +305,7 @@ def _process(connector, runners, prompts, item, document, own, history, last):
         look = runners.triage.run(prompts.triage, triage_message(connector, document, history), own / "look.jsonl")
         if look.verdict != "import" or not look.ok:
             return look, None
-        why = f"a first look judged it worth recording: {look.summary or 'no reason given'}"
+        why = f"a first look judged it worth recording: {_one_line(look.summary) or 'no reason given'}"
     text = message(connector, item, document, last, why)
     return look, runners.importer.run(prompts.imports, text, own / "transcript.jsonl", document.addresses)
 
@@ -335,8 +343,8 @@ def _import(connector, state, runners, prompts, entries, parallel, counts, say, 
                     if reviews:
                         reviews.finish(item)
                     recent.append(_trouble(result))
-                    if sum(t is not None for t in recent) >= TROUBLE_LIMIT:
-                        raise Tripped(_tripped(recent, connector.name))
+                if sum(t is not None for t in recent) >= TROUBLE_LIMIT:  # once every run that ended is recorded
+                    raise Tripped(_tripped(recent, connector.name))
                 if reviews:
                     reviews.step()
         except BaseException as e:

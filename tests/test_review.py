@@ -140,6 +140,13 @@ def test_a_review_reads_the_email_itself_where_its_digest_leaves_doubt():
     assert "`reimport`: each email to import again, its id from the digest's heading and why" in prompt
 
 
+def test_a_review_takes_back_a_fact_that_is_not_so():
+    # Facts on the wrong note stayed: a review could add observations, never take one back.
+    notes = type("Connector", (), {"noun": "email"})()
+    prompt = " ".join(review.system_prompt(notes, 100, "2026-10-23").split())
+    assert "sits on the wrong note: `retract_observation` it, then `add_observation` it where it belongs" in prompt
+
+
 def test_a_review_looks_up_the_name_of_a_note_named_after_an_address_handle():
     # 41 people from mass mail kept names like "davidinacio97"; a later email or a CC list often gives the real one.
     notes = type("Connector", (), {"noun": "email"})()

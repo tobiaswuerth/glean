@@ -293,7 +293,7 @@ def test_doctor_when_all_is_well(doctor, capsys):
     assert all(line.startswith("ok  ") for line in lines)
     assert any("first look: no tools but its answer, no servers" in line for line in lines)
     assert any("import: 18 tools, orbit and sift connected, nothing else" in line for line in lines)
-    assert any("review: 20 tools on orbit's /mcp, merges included" in line for line in lines)
+    assert any("review: 21 tools on orbit's /mcp, merges included" in line for line in lines)
     assert any("mail: reads .eml files from" in line for line in lines)
     assert any("sift: the collection 'data' holds the mail archive" in line for line in lines)
     assert any("sift: the collection 'crm' holds orbit's vault" in line for line in lines)
@@ -319,10 +319,10 @@ def test_doctor_with_the_agent_check_failing(doctor, capsys, monkeypatch):
 
 
 def test_doctor_names_an_orbit_too_old_for_the_review(doctor, capsys, monkeypatch):
-    monkeypatch.setenv("FAKE_CLAUDE", json.dumps({"mode": "old_orbit"}))  # no settle_review: orbit before 0.6
+    monkeypatch.setenv("FAKE_CLAUDE", json.dumps({"mode": "old_orbit"}))  # no retract_observation: before 0.10
     code, out, _ = run(capsys, "doctor")
     assert code == 1
-    assert "!!  review: the servers lack tools glean needs: mcp__orbit__settle_review; update orbit" in out
+    assert "!!  review: the servers lack tools glean needs: mcp__orbit__retract_observation; update orbit" in out
 
 
 def test_doctor_without_a_review_checks_none(doctor, capsys, mail_home):

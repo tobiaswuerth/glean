@@ -5,6 +5,44 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-10-24
+
+A first look decides, a stronger model imports, and the reviews run alongside and read what they doubt. Needs orbit
+0.10.0 and sift 1.5.0 for the review.
+
+### Added
+
+- A first look at each item: `[agent] model` (Haiku) with no tools and no servers, only its answer, judges by the text
+  whether the item is worth recording (`import`, `skipped` or `spam`, with a reason), with the headers' signals and
+  the sender's history as evidence; its prompt is `prompts/triage.md` and the connector's `triage.md`. What it judges
+  worth it goes to the import, by `[agent] import_model` (new, Sonnet by default), which knows why and may still call
+  it skipped or spam where that is plain. The item's cost, turns and report count both runs.
+- An item reset by the owner (`glean mail reset`) or named by a review to import again is imported without a first
+  look, with why: a review's `reimport` now names why for each, and runs.db keeps it (`outcomes.wanted`, schema 2;
+  glean 0.12's runs.db gains it when first opened, and an older glean then refuses it).
+- The review reads an email where its digest leaves doubt: each digest names the email's file, which the review reads
+  with sift's `get` before it changes, merges, asks or sends anything back.
+- The review takes back an observation that isn't so, or sits on the wrong note, with orbit's `retract_observation`,
+  and records it where it belongs.
+
+### Changed
+
+- Reviews run while the rest of a batch is imported: one of every `review_every` items, in order, once all of them
+  are recorded, and one at a time. Ctrl+C and the circuit breaker stop the review in progress too, which then reports
+  nothing.
+- `glean doctor` checks the first look, the import and the review each.
+- `run --dry-run` heads each message with its item, and shows a first look's message, or an import's for an item
+  that gets none.
+- What a model said about an item (a first look's or an earlier run's reason, a review's why) reaches the import as
+  one line of at most 200 characters, as the item's text could steer it.
+
+### Fixed
+
+- Ctrl+C or the circuit breaker lets no run start after it: a run whose process hadn't started yet ran on unkilled,
+  and the batch waited for it.
+- The circuit breaker records every run that ended with the one that tripped it: they were taken as stopped, and
+  their items imported again by the next run.
+
 ## [0.12.1] - 2026-10-24
 
 ### Changed

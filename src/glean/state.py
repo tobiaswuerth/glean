@@ -183,10 +183,13 @@ class State:
             raise GleanError(f"{path} was written by a newer glean (schema {version}); update glean")
 
     def _upgrade(self):
-        """Bring a runs.db of an older glean in line: glean 0.12's outcomes lack `wanted`."""
+        """Bring a runs.db of an older glean in line: glean 0.12's outcomes lack `wanted`. In one write transaction, so
+        that a second glean opening it at the same moment waits, then finds it done."""
+        self.db.execute("BEGIN IMMEDIATE")
         columns = [r[1] for r in self.db.execute("PRAGMA main.table_info(outcomes)")]
         if columns and "wanted" not in columns:
             self.db.execute("ALTER TABLE outcomes ADD COLUMN wanted TEXT")
+        self.db.commit()
 
     def __enter__(self):
         return self
