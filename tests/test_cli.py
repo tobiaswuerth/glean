@@ -418,6 +418,7 @@ def test_download_keeps_sift_in_line(mail_home, capsys, monkeypatch, tmp_path):
     assert code == 0
     archive = mail_home / "mails"
     assert f"sift: added the collection 'mails' for {archive}" in err
+    assert "sift: indexing mails, which takes a while the first time: scans are read with OCR" in err
     assert "sift: mails: 3 files, 3 added, 0 changed, 0 removed (0.1s)" in err
     assert "message.eml" in (archive / ".siftignore").read_text(encoding="utf-8")
     assert fake.calls[-1] == ["index", "mails"]

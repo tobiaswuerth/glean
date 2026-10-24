@@ -5,6 +5,14 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.11.1] - 2026-10-24
+
+### Fixed
+
+- A download or run waits for sift's index of the archive however long it takes: a first index of a large archive,
+  scans read with OCR, was stopped after half an hour, unfinished, and its worker processes kept glean waiting. glean
+  says beforehand that it indexes.
+
 ## [0.11.0] - 2026-10-24
 
 Each run hears how the sender's earlier mail was judged; a company's answer to the owner's question is imported.

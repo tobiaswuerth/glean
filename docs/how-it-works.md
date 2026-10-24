@@ -279,8 +279,8 @@ name`). orbit names its vault's folder in the resource `orbit://vault`, which gl
 writes the `.siftignore` of the archive's collection where the collection's folder is glean's (its home or the archive).
 After a download, and before a run, it has sift index the archive's collection (a download stopped early hasn't), which
 makes every new email findable by keyword search, and has sift read the scans among the saved attachments with OCR (half
-a minute a page on a fast GPU, once); the server embeds what the agent reindexes, and `sift embed` the rest. `[sift]
-add_collections = false` leaves sift to you.
+a minute a page on a fast GPU, once, and glean waits for it however long it takes); the server embeds what the agent
+reindexes, and `sift embed` the rest. `[sift] add_collections = false` leaves sift to you.
 
 ## Adding a source
 
