@@ -112,7 +112,8 @@ def test_the_system_prompt_imports_what_people_wrote_and_automated_mail_that_set
     prompt = " ".join(pipeline.system_prompt(cfg, notes).split())
     assert "what a person wrote to people, however short or passing" in prompt
     assert "own request (a contact form, an inquiry, a question about an order or a bill)" in prompt
-    assert "and its receipt when that quotes the request" in prompt
+    assert "and its receipt when that quotes the owner's own words" in prompt
+    assert "a case or request of the owner's that it settles (an account restored" in prompt
     assert (
         "an automated note that settles a lasting fact about the owner: the receipt of or answer to an application"
         in (prompt)
