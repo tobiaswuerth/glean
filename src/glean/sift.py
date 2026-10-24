@@ -14,7 +14,6 @@ from .errors import GleanError
 
 IGNORE_FILE = ".siftignore"
 IGNORE_HEAD = "# Left out by glean: what it keeps for itself, or what sift finds in another file already"
-INDEX_SECONDS = 1800  # a first index of a large archive takes a while
 
 
 class Sift:
@@ -52,8 +51,9 @@ class Sift:
 
     def index(self, name):
         """Bring the collection's index up to date with its folder: new, changed and gone files (keyword search; the
-        server embeds for semantic search what the agent reindexes, `sift embed` the rest)."""
-        return self._call("index", name, timeout=INDEX_SECONDS).stderr.strip().splitlines()[-1:]
+        server embeds for semantic search what the agent reindexes, `sift embed` the rest). As long as it takes: a
+        first index of a large archive, scans read with OCR, takes hours."""
+        return self._call("index", name, timeout=None).stderr.strip().splitlines()[-1:]
 
 
 def holder(collections, folder):
@@ -138,6 +138,7 @@ def keep(cfg, connector, say=console.say, index=False):
             if added:
                 say(f"sift: added the collection {names['vault']!r} for orbit's vault, {vault}")
         if index:
+            say(f"sift: indexing {names['archive']}, which takes a while the first time: scans are read with OCR")
             for line in found.index(names["archive"]):
                 say(f"sift: {line}")
     except GleanError as e:

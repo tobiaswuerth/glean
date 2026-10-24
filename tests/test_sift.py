@@ -107,6 +107,15 @@ def test_index_says_what_sift_did(tmp_path):
     assert fake.calls == [["index", "mail"]]
 
 
+def test_an_index_takes_as_long_as_it_takes(tmp_path):
+    # A first index of 19,000 emails, scans read with OCR, was stopped after half an hour, unfinished.
+    asked = []
+    s = sift.Sift(["sift"], lambda cmd, **kwargs: asked.append(kwargs["timeout"]) or done(stderr="mail: 1 file"))
+    s.index("mail")
+    s.add("x", "mail")
+    assert asked == [None, 120]
+
+
 def test_a_failing_sift_command_is_named(tmp_path):
     s, _ = make(tmp_path, fail="add")
     with pytest.raises(
