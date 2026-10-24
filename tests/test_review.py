@@ -10,7 +10,7 @@ from glean.state import State
 
 from .conftest import NOW
 from .notes_connector import Notes
-from .test_pipeline import FakeAgent
+from .test_pipeline import FakeAgent, runners
 
 
 class Reviewer:
@@ -35,21 +35,22 @@ def batch(tmp_path):
         notes.download(state)
         items = pipeline.choose(state, notes)
         imported = agent.Result("success", True, "Imported.", None, 0.1, 5, 99, verdict="imported", summary="an offer")
-        pipeline.run(cfg, notes, state, FakeAgent([imported] * 3), items, print, print)
+        pipeline.run(cfg, notes, state, runners(FakeAgent([imported] * 3)), items, print, print)
         yield cfg, notes, state, items
 
 
 def test_a_digest_says_what_the_item_was_what_the_run_answered_and_its_report(batch, monkeypatch):
     _, notes, state, _ = batch
     item = state.find("notes", "a")
-    text = review.digest(notes.home, item)
-    assert text.startswith(f"### {item.id} · 2026-10-01 · done · Note a · from someone\nverdict imported: an offer\n")
+    text = review.digest(notes, item)
+    head = f"### {item.id} · 2026-10-01 · done · Note a · from someone · {notes.archive / item.document}"
+    assert text.startswith(f"{head}\nverdict imported: an offer\n")  # its file, for the review to read if in doubt
     assert "Imported." in text
     monkeypatch.setattr(review, "DIGEST_CHARS", 3)
-    assert review.digest(notes.home, item).endswith("\nImp…")
+    assert review.digest(notes, item).endswith("\nImp…")
     report = notes.home / "runs" / item.report
     report.write_text(report.read_text(encoding="utf-8").replace('reason: "an offer"', "reason: by hand"), "utf-8")
-    assert "verdict imported: by hand\n" in review.digest(notes.home, item)  # a value as a hand edit left it
+    assert "verdict imported: by hand\n" in review.digest(notes, item)  # a value as a hand edit left it
 
 
 def test_a_skipped_item_s_digest_is_a_line(batch):
@@ -58,29 +59,32 @@ def test_a_skipped_item_s_digest_is_a_line(batch):
     cfg, notes, state, _ = batch
     skipped = agent.Result("success", True, "Skipped.", None, 0.01, 2, 9, verdict="skipped", summary="Acme's news")
     item = state.reset(state.find("notes", "c"))
-    pipeline.run(cfg, notes, state, FakeAgent([skipped]), [item], print, print)
-    text = review.digest(notes.home, state.find("notes", "c"))
-    assert text == f"### {item.id} · 2026-10-03 · skipped · Note c · from someone: Acme's news"
+    pipeline.run(cfg, notes, state, runners(FakeAgent([skipped])), [item], print, print)
+    text = review.digest(notes, state.find("notes", "c"))
+    file = notes.archive / state.find("notes", "c").document
+    assert text == f"### {item.id} · 2026-10-03 · skipped · Note c · from someone · {file}: Acme's news"
     spam = agent.Result("success", True, "Spam.", None, 0.01, 2, 9, verdict="spam", summary="a fake invoice")
-    pipeline.run(cfg, notes, state, FakeAgent([spam]), [state.reset(state.find("notes", "c"))], print, print)
-    assert review.digest(notes.home, state.find("notes", "c")).endswith("from someone: spam: a fake invoice")
+    pipeline.run(cfg, notes, state, runners(FakeAgent([spam])), [state.reset(state.find("notes", "c"))], print, print)
+    assert review.digest(notes, state.find("notes", "c")).endswith("Note c.md: spam: a fake invoice")
 
 
 def test_items_without_a_report_of_their_own_have_no_digest(batch):
     _, notes, state, _ = batch
     item = state.reset(state.find("notes", "a"))
-    assert review.digest(notes.home, item) is None  # new again: what it made is forgotten
+    assert review.digest(notes, item) is None  # new again: what it made is forgotten
     state.set_status(item, "ignored")
-    assert review.digest(notes.home, state.find("notes", "a")) is None
+    assert review.digest(notes, state.find("notes", "a")) is None
 
 
 def test_a_review_names_items_to_import_again_and_suggests_changes(batch):
     cfg, notes, state, items = batch
     b = state.find("notes", "b")
-    reviewer = Reviewer({"report": "Merged two Hans.", "reimport": [b.id, "not-reviewed"], "suggestions": ["Say so."]})
+    again = [{"id": b.id, "why": "Hans Müller wrote it"}, {"id": "not-reviewed", "why": "x"}, "no object"]
+    reviewer = Reviewer({"report": "Merged two Hans.", "reimport": again, "suggestions": ["Say so."]})
     said = []
     assert review.run(cfg, notes, state, reviewer, items[:2], say=said.append, now=lambda: NOW) == 1
-    assert state.find("notes", "b").status == "new"  # imported again by the next run
+    b = state.find("notes", "b")
+    assert (b.status, b.wanted) == ("new", "the review: Hans Müller wrote it")  # imported next, without a first look
     prompt, message = reviewer.messages[0]
     assert "You review what 2 import runs just wrote" in prompt
     assert not re.search(r"\{[a-z_]+\}", prompt)  # every placeholder filled
@@ -88,7 +92,10 @@ def test_a_review_names_items_to_import_again_and_suggests_changes(batch):
     (report,) = (notes.home / "runs" / "reviews").glob("*.md")
     text = report.read_text(encoding="utf-8")
     assert f'reimport: ["{b.id}"]' in text
-    assert text.endswith("Merged two Hans.\n\n## Suggestions for the importer\n\n- Say so.\n")
+    assert text.endswith(
+        f"Merged two Hans.\n\n## To import again\n\n- {b.id}: Hans Müller wrote it\n\n## Suggestions for the "
+        "importer\n\n- Say so.\n"
+    )
     assert said[-1].startswith("reviewed 2 imports ($1.50): 1 to import again; ")
 
 
@@ -122,6 +129,15 @@ def test_a_review_leaves_imported_automated_mail_that_settles_a_fact_about_the_o
     notes = type("Connector", (), {"noun": "email"})()
     prompt = " ".join(review.system_prompt(notes, 100, "2026-10-23").split())
     assert "automated mail and settles no lasting fact about the owner (an application, a registration" in prompt
+
+
+def test_a_review_reads_the_email_itself_where_its_digest_leaves_doubt():
+    # Digests are short: a review merged, closed and asked from them alone, and named emails to import again that it
+    # had never read.
+    notes = type("Connector", (), {"noun": "email"})()
+    prompt = " ".join(review.system_prompt(notes, 100, "2026-10-23").split())
+    assert "read the email itself with sift `get`, giving its file's path from the digest's heading" in prompt
+    assert "`reimport`: each email to import again, its id from the digest's heading and why" in prompt
 
 
 def test_a_review_looks_up_the_name_of_a_note_named_after_an_address_handle():

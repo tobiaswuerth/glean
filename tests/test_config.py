@@ -28,6 +28,7 @@ def test_the_shared_settings_have_defaults(tmp_path):
     assert c.agent.effort is None
     assert c.agent.claude is None
     assert c.agent.parallel == 1
+    assert (c.agent.model, c.agent.import_model) == ("haiku", "sonnet")  # Haiku judges, Sonnet imports
     assert (c.agent.review_every, c.agent.review_model) == (100, "opus")
     assert c.orbit_url == "http://127.0.0.1:8775/mcp/write"  # orbit's tools without upkeep
     assert c.orbit_vault is None  # asked from orbit
@@ -39,6 +40,7 @@ def test_every_shared_setting_can_be_given(tmp_path):
     text = MAIL + (
         '[agent]\nclaude = "bin/claude.exe"\nmodel = "opus"\neffort = "high"\nmax_turns = 10\n'
         'timeout_minutes = 2.5\nmax_budget_usd = 0\nparallel = 4\nreview_every = 0\nreview_model = "sonnet"\n'
+        'import_model = "opus"\n'
         '[orbit]\nurl = "http://127.0.0.1:8776/mcp"\nvault = "crm"\n'
         '[sift]\nurl = "http://127.0.0.1:9000/mcp"\ncrm_collection = "vault"\ndocument_collections = ["docs"]\n'
         "add_collections = false\n"
@@ -50,6 +52,7 @@ def test_every_shared_setting_can_be_given(tmp_path):
     assert c.agent.max_budget_usd is None  # 0: no limit
     assert c.agent.parallel == 4
     assert (c.agent.review_every, c.agent.review_model) == (0, "sonnet")  # 0: no review
+    assert c.agent.import_model == "opus"
     assert c.orbit_url.endswith(":8776/mcp")
     assert c.orbit_vault == tmp_path / "crm"
     assert c.sift.url.endswith(":9000/mcp")

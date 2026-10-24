@@ -16,7 +16,8 @@ TEMPLATE = """# glean's configuration. Relative paths are relative to this file'
 
 [agent]
 claude = ""              # the claude executable; empty: ~/.local/bin/claude.exe, or claude on PATH
-model = "haiku"          # haiku, sonnet or opus, or a full model id
+model = "haiku"          # looks at each item first: import, skip or spam; haiku, sonnet, opus or a full model id
+import_model = "sonnet"  # imports what is to be imported
 effort = ""              # low, medium, high, xhigh or max; empty: the model's default
 max_turns = 60           # per item
 timeout_minutes = 5      # per item
@@ -140,7 +141,8 @@ class Table:
 @dataclass(frozen=True)
 class Agent:
     claude: Path | None = None
-    model: str = "haiku"
+    model: str = "haiku"  # the first look at each item: import, skip or spam
+    import_model: str = "sonnet"
     effort: str | None = None
     max_turns: int = 60
     timeout_minutes: float = 5
@@ -199,6 +201,7 @@ def load(path, connectors=None):
     agent = Agent(
         claude=t.path("claude"),
         model=t.text("model", Agent.model),
+        import_model=t.text("import_model", Agent.import_model),
         effort=t.choice("effort", EFFORTS),
         max_turns=t.whole("max_turns", Agent.max_turns),
         timeout_minutes=t.number("timeout_minutes", Agent.timeout_minutes),

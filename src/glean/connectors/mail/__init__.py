@@ -361,6 +361,12 @@ class Mail(Connector):
         return frozenset({*keys, f"thread:{root}"})
 
     def instructions(self):
-        text = files(__package__).joinpath("instructions.md").read_text(encoding="utf-8")
+        return self._prompt("instructions.md")
+
+    def triage_instructions(self):
+        return self._prompt("triage.md")
+
+    def _prompt(self, name):
+        text = files(__package__).joinpath(name).read_text(encoding="utf-8")
         *others, last = self.config.my_addresses  # the account's address at least
         return text.replace("{owner_addresses}", f"{', '.join(others)} and {last}" if others else last)

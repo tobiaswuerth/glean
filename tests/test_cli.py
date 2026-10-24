@@ -95,13 +95,15 @@ def test_the_whole_flow(mail_home, capsys):
     assert out.startswith("ignored ")
     code, out, _ = run(capsys, "mail", "reset", "caf1234@mail.acme.example")
     assert out.startswith("new     ")
+    listed = json.loads(run(capsys, "mail", "list", "--json")[1])
+    assert [i["wanted"] for i in listed] == ["the owner"]  # imported without a first look
 
     code, out, _ = run(capsys, "status")
     assert "4 emails: 1 new, 2 done, 1 skipped" in out
     code, out, _ = run(capsys, "status", "--json")
     status = json.loads(out)
     assert sum(status["sources"]["mail"]["items"].values()) == 4
-    assert status["sources"]["mail"]["cost_usd"] == pytest.approx(0.24)
+    assert status["sources"]["mail"]["cost_usd"] == pytest.approx(0.48)  # a first look and an import each
 
 
 def test_a_download_takes_one_count_above_zero(mail_home, capsys):
@@ -289,8 +291,9 @@ def test_doctor_when_all_is_well(doctor, capsys):
     assert code == 0, out
     lines = out.splitlines()
     assert all(line.startswith("ok  ") for line in lines)
-    assert any("agent: 18 tools, orbit and sift connected, nothing else" in line for line in lines)
-    assert any("review: 19 tools on orbit's /mcp, merges included" in line for line in lines)
+    assert any("first look: no tools but its answer, no servers" in line for line in lines)
+    assert any("import: 18 tools, orbit and sift connected, nothing else" in line for line in lines)
+    assert any("review: 20 tools on orbit's /mcp, merges included" in line for line in lines)
     assert any("mail: reads .eml files from" in line for line in lines)
     assert any("sift: the collection 'data' holds the mail archive" in line for line in lines)
     assert any("sift: the collection 'crm' holds orbit's vault" in line for line in lines)
@@ -305,14 +308,14 @@ def test_doctor_names_what_is_wrong(doctor, capsys):
     assert "needs 2.1.290+" in out
     assert "!!  claude: not signed in" in out
     assert "!!  sift: nothing answers at http://127.0.0.1:8765/mcp" in out
-    assert "agent:" not in out  # not tried while something else is wrong
+    assert "import:" not in out  # not tried while something else is wrong
 
 
 def test_doctor_with_the_agent_check_failing(doctor, capsys, monkeypatch):
     monkeypatch.setenv("FAKE_CLAUDE", json.dumps({"mode": "missing"}))
     code, out, _ = run(capsys, "doctor")
     assert code == 1
-    assert "!!  agent: the servers lack tools" in out
+    assert "!!  import: the servers lack tools" in out
 
 
 def test_doctor_names_an_orbit_too_old_for_the_review(doctor, capsys, monkeypatch):

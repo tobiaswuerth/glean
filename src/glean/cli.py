@@ -237,7 +237,13 @@ def run_command(connector, args, state):
         if not items:
             console.say(f"no {connector.noun}s waiting; `glean {connector.name} download` fetches new ones")
             return 0
-        runner = None if args.dry_run else agent.Agent(args.config)
+        runner = (
+            None
+            if args.dry_run
+            else pipeline.Runners(
+                agent.Agent(args.config, role=agent.TRIAGE), agent.Agent(args.config, role=agent.IMPORT)
+            )
+        )
         # indexed again: a download stopped before its end leaves what it stored unsearchable
         names = None if args.dry_run else sift.keep(args.config, connector, index=True)
         counts = pipeline.run(
@@ -298,7 +304,7 @@ def show_command(connector, args, state):
 def mark(connector, args, state, status):
     for ref in args.ids:
         found = state.get(connector.name, ref, connector.key)
-        item = state.reset(found) if status == "new" else state.set_status(found, status)
+        item = state.reset(found, "the owner") if status == "new" else state.set_status(found, status)
         print(f"{item.status:<7} {_row(item)}")
     return 0
 
@@ -352,17 +358,18 @@ def doctor_command(args):
     for name, url in (("orbit", cfg.orbit_url), ("sift", cfg.sift.url)):
         checks.append(_reachable(name, url))
     if all(ok for ok, _ in checks):
-        try:
-            tools = agent.Agent(cfg).prepare()
-            checks.append((True, f"agent: {len(tools)} tools, orbit and sift connected, nothing else"))
-        except GleanError as e:
-            checks.append((False, f"agent: {e}"))
+        roles = [
+            (agent.TRIAGE, "first look", "no tools but its answer, no servers"),
+            (agent.IMPORT, "import", "{n} tools, orbit and sift connected, nothing else"),
+        ]
         if cfg.agent.review_every:
+            roles.append((agent.REVIEW, "review", "{n} tools on orbit's /mcp, merges included"))
+        for role, name, said in roles:
             try:
-                tools = agent.Agent(cfg, role=agent.REVIEW).prepare()
-                checks.append((True, f"review: {len(tools)} tools on orbit's /mcp, merges included"))
+                tools = agent.Agent(cfg, role=role).prepare()
+                checks.append((True, f"{name}: {said.format(n=len(tools))}"))
             except GleanError as e:
-                checks.append((False, f"review: {e}"))
+                checks.append((False, f"{name}: {e}"))
     if cfg.orbit_url.rstrip("/").endswith("/mcp"):
         checks.append(
             (True, "orbit: /mcp serves merges and renames too, which glean hides; /mcp/write leaves them out")

@@ -52,6 +52,7 @@ def test_prepare_learns_which_tools_to_hide(tmp_path, fake):
             "mcp__orbit__lint_vault",
             "mcp__orbit__settle_review",
             "mcp__sift__vsearch",
+            "mcp__sift__get",
         ]
     )
     (start,) = starts()
@@ -83,7 +84,7 @@ def test_a_run_is_sandboxed_and_fed_on_stdin(tmp_path, fake):
         assert flag in args
     assert args[args.index("--output-format") + 1] == args[args.index("--input-format") + 1] == "stream-json"
     assert args[args.index("--max-turns") + 1] == "9"
-    assert args[args.index("--model") + 1] == "haiku"
+    assert args[args.index("--model") + 1] == "sonnet"  # import_model: imports need care, the first look less
     assert args[args.index("--max-budget-usd") + 1] == "0.5"
     assert args[args.index("--effort") + 1] == "high"
     assert run["stdin"] == "Import this.\n\nGrüezi"
@@ -99,17 +100,46 @@ def test_a_review_run_has_orbit_s_upkeep_its_own_answer_model_and_limits(tmp_pat
     a = agent.Agent(cfg(tmp_path, 'review_model = "opus"\nmax_budget_usd = 0.5\n'), command=[sys.executable, FAKE],
                     role=agent.REVIEW)  # fmt: skip
     result = a.run("REVIEW PROMPT", "digests")
-    assert (result.ok, result.answer["reimport"], result.report) == (True, ["e1"], "Merged two Hans.")
+    assert (result.ok, result.answer["reimport"][0]["id"], result.report) == (True, "e1", "Merged two Hans.")
     _, run = starts()
     args = run["args"]
     allowed = args[args.index("--allowedTools") + 1].split(",")
     assert "mcp__orbit__merge_entities" in allowed
     assert "mcp__orbit__settle_review" in allowed  # it acts on the owner's answers
     assert "mcp__orbit__log_interaction" not in allowed
+    assert "mcp__sift__get" in allowed  # it reads an email it doubts
     assert json.loads(args[args.index("--json-schema") + 1]) == agent.REVIEW.schema
     assert (args[args.index("--model") + 1], args[args.index("--max-turns") + 1]) == ("opus", "90")
     assert args[args.index("--max-budget-usd") + 1] == "5.0"
     assert run["mcp"]["mcpServers"]["orbit"]["url"] == "http://127.0.0.1:8775/mcp"  # with merges
+
+
+def test_a_first_look_has_no_servers_no_tools_but_its_answer_and_the_everyday_model(tmp_path, fake):
+    # It judges by the text alone, as the import runs did before their first tool call: quick, cheap, and it can
+    # change nothing.
+    starts = fake(reason="Anna Keller asks about the offer")
+    a = agent.Agent(cfg(tmp_path), command=[sys.executable, FAKE], role=agent.TRIAGE)
+    assert a.prepare() == []
+    result = a.run("TRIAGE PROMPT", "an email")
+    assert (result.ok, result.verdict, result.summary) == (True, "import", "Anna Keller asks about the offer")
+    _, run = starts()
+    args = run["args"]
+    assert run["mcp"] == {"mcpServers": {}}
+    assert args[args.index("--allowedTools") + 1] == agent.ANSWER
+    assert "--disallowedTools" not in args  # nothing to hide
+    assert args[args.index("--model") + 1] == "haiku"
+    assert json.loads(args[args.index("--json-schema") + 1]) == agent.TRIAGE.schema
+
+
+def test_a_first_look_without_its_answer_is_asked_for_just_that(tmp_path, fake):
+    fake("unstructured_once")
+    result = agent.Agent(cfg(tmp_path), command=[sys.executable, FAKE], role=agent.TRIAGE).run("p", "m")
+    assert (result.verdict, result.followups) == ("import", 1)
+    (asked,) = [json.loads(line) for line in (tmp_path / "claude.log.followups").read_text("utf-8").splitlines()]
+    assert asked == (
+        "glean checked your answer, and this is left to do:\n- no answer came: give it with the StructuredOutput "
+        "tool, its outcome and reason"
+    )
 
 
 def test_orbit_s_endpoint_for_each_role():
@@ -427,7 +457,7 @@ def test_a_result_without_its_structured_answer_is_asked_for_it_and_then_has_non
     fake("unstructured", report="Skipped, in words.")
     result = make(tmp_path).run("p", "m")
     assert (result.ok, result.verdict, result.followups) == (True, None, 2)
-    assert result.checks == [agent.NO_ANSWER]
+    assert result.checks == [agent.IMPORT.no_answer]
 
 
 def test_an_answer_given_when_asked_again_counts(tmp_path, fake):

@@ -30,6 +30,7 @@ OTHERS = [
     "mcp__orbit__lint_vault",
     "mcp__orbit__settle_review",
     "mcp__sift__vsearch",
+    "mcp__sift__get",
 ]
 
 
@@ -65,7 +66,8 @@ def main():
     if mode == "silent":
         sys.exit(0)
     hidden = set(option.get("--disallowedTools", "").split(","))
-    tools = [t for t in ALLOWED + OTHERS if t not in hidden]
+    configured = json.loads(Path(option["--mcp-config"]).read_text(encoding="utf-8"))["mcpServers"]
+    tools = [t for t in ALLOWED + OTHERS if t not in hidden and t.split("__")[1] in configured]
     if "--json-schema" in option:
         tools = ["StructuredOutput", *tools]
     if mode == "builtin":
@@ -74,18 +76,22 @@ def main():
         tools = [t for t in tools if t != "mcp__orbit__propose_review"]
     if mode == "old_orbit":
         tools = [t for t in tools if t != "mcp__orbit__settle_review"]
-    servers = [{"name": "orbit", "status": "connected"}, {"name": "sift", "status": "connected"}]
-    if mode == "offline":
-        servers[1]["status"] = "failed"
+    servers = [{"name": name, "status": "connected"} for name in configured]
+    for server in servers:
+        if mode == "offline" and server["name"] == "sift":
+            server["status"] = "failed"
     emit({"type": "system", "subtype": "init", "tools": tools, "mcp_servers": servers, "model": "claude-sonnet-5-5"})
     if mode == "hang":
         time.sleep(60)
-    answer(spec | {"first": first}, mode, 0)
+    schema = json.loads(option.get("--json-schema", "{}"))
+    triage = "import" in schema.get("properties", {}).get("outcome", {}).get("enum", [])  # a first look: no report
+    spec |= {"first": first, "triage": triage}
+    answer(spec, mode, 0)
     for n, followup in enumerate(incoming, 1):
         if spec.get("log"):
             with open(spec["log"] + ".followups", "a", encoding="utf-8") as f:
                 f.write(json.dumps(followup) + "\n")
-        answer(spec | {"first": first}, mode, n)
+        answer(spec, mode, n)
     if mode == "linger":
         time.sleep(60)
 
@@ -114,16 +120,19 @@ def answer(spec, mode, n):
               "num_turns": 1, "total_cost_usd": 0, "duration_ms": 5})  # fmt: skip
         return
     if mode == "review":
-        given = {"report": "Merged two Hans.", "reimport": ["e1"], "suggestions": ["Say who signs."]}
+        given = {"report": "Merged two Hans.", "reimport": [{"id": "e1", "why": "Hans wrote it"}],
+                 "suggestions": ["Say who signs."]}  # fmt: skip
         emit({"type": "result", "subtype": "success", "is_error": False, "result": json.dumps(given), "num_turns": 30,
               "total_cost_usd": 1.5, "duration_ms": 60000, "structured_output": given})  # fmt: skip
         return
-    verdict = {"skip": "skipped", "spam": "spam"}.get(mode, "imported")
+    verdict = {"skip": "skipped", "spam": "spam"}.get(mode, "import" if spec["triage"] else "imported")
     if verdict == "imported" and not (mode == "stubborn" or (mode == "sloppy" and n == 0)):
         work(spec.get("first", ""))
     report = spec.get("report", "**Interaction**: int_1")
     denied = [{"tool_name": "mcp__orbit__merge_entities", "tool_input": {}}] if mode == "denied" else []
-    given = {"outcome": verdict, "reason": spec.get("reason", "a reply about the offer"), "report": report}
+    given = {"outcome": verdict, "reason": spec.get("reason", "a reply about the offer")}
+    if not spec["triage"]:
+        given["report"] = report
     event = {"type": "result", "subtype": "success", "is_error": False, "result": json.dumps(given), "num_turns": 7,
              "total_cost_usd": round(0.12 * (n + 1), 2), "duration_ms": 4321, "permission_denials": denied}  # fmt: skip
     if mode != "unstructured" and not (mode == "unstructured_once" and n == 0):

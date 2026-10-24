@@ -9,10 +9,6 @@ name `Me`; never anyone else. If orbit lists one under `unknown_addresses`, add 
 `match: "Me"`). An address that carries the owner's name and acts as theirs (a school or work account, a forward) is
 Me too: link it as Me, and propose a review of kind `address` (candidate Me, that address) for the owner to confirm.
 
-Import also an email the owner wrote to a person, however short; a person's words a system brings (a support agent's
-reply in a ticket, "Aktualisiert von"); a person sharing something with the owner or inviting them through a
-platform. Skip notices of comments in a shared document (Google Docs, Dropbox Paper): the conversation lives there.
-
 1. **Read it all.** Tell the newest message from signatures, quoted history and forwarded parts, and each signature
    from who wrote that part. The interaction is this email; its facts are what the newest message states. Quoted
    history belongs to the email that said it (orbit's `thread` shows those it has). In a forward, the owner's words
