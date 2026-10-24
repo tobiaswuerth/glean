@@ -163,7 +163,10 @@ evidence to weigh:
 - `List-Unsubscribe`, `List-Id`, `Precedence: bulk/list/junk`, `Auto-Submitted`;
 - a sender no person answers from: `*noreply*`, `alerts@`, `notifications@`, `newsletter@`, `newsletter.` subdomains
   and the like (role addresses people answer from, `support@`, `info@`, are not among them);
-- that the owner has written to the sender before (the recipients of the owner's mail).
+- that the owner has written to the sender before (the recipients of the owner's mail);
+- how the runs judged the earlier emails from the same address, and from others at its domain (not a free-mail one):
+  how many were imported, skipped or spam, with the latest subjects or reasons. The prompt makes this evidence about
+  the sender, not about the email: a sender whose mail was skipped can still send one to import.
 
 What the owner wrote gets none. Automated mail costs a run of two turns (one is the answer), no tool calls, about $0.002
 with Haiku; one that settles a lasting fact about the owner (a registration or admission, a service or contract that
@@ -291,7 +294,7 @@ A source is a `Connector` (`glean/connectors/base.py`) registered in `glean/conn
 | `download(state, oldest, latest)` | stores what is new in the archive and its database, or only the N oldest or newest of it, without changing the source |
 | `document(item)` | writes the item's Markdown and the files sift should index; returns a `Document`, with `related`: what the item shares with others it mustn't be imported beside |
 | `instructions()` | the source's part of the agent's prompt |
-| `commands`, `ignored`, `check()`, `key()`, `upgrade()`, `after_setup()` | optional: commands of its own (`login`), files sift should leave out, checks for `glean doctor`, how a person writes a key, bringing an older glean's items in line, a step after setup |
+| `commands`, `ignored`, `check()`, `key()`, `sender()`, `upgrade()`, `after_setup()` | optional: commands of its own (`login`), files sift should leave out, checks for `glean doctor`, how a person writes a key, who wrote an item and their group (an address and its domain), bringing an older glean's items in line, a step after setup |
 
 The shared commands (`download`, `list`, `run`, `show`, `ignore`, `reset`), the state, the schedule, the agent
 run, sift's collections and the reports then work for it as they do for mail. `tests/notes_connector.py` is a complete

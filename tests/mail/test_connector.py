@@ -262,6 +262,13 @@ def test_the_instructions_name_the_owners_addresses(tmp_path):
     ) in mail.instructions()
 
 
+def test_a_sender_is_its_address_and_its_organization_s_domain(tmp_path):
+    mail, _ = connector(tmp_path)
+    assert mail.sender("Hans Müller <Hans.Mueller@Acme.example>") == ("hans.mueller@acme.example", "acme.example")
+    assert mail.sender("anna.keller@gmail.com") == ("anna.keller@gmail.com", None)  # free mail: no organization
+    assert mail.sender("Undisclosed recipients") == (None, None)
+
+
 def test_keys_as_people_write_them(tmp_path):
     mail, _ = connector(tmp_path)
     assert mail.key("<ABC@x.example>") == "abc@x.example"

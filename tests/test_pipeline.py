@@ -197,6 +197,69 @@ def test_the_run_gets_the_addresses_its_interaction_must_name(setup, monkeypatch
     assert fake.addresses == ("a@x.example",)
 
 
+def history_setup(tmp_path, authors):
+    (tmp_path / "glean.toml").write_text("", encoding="utf-8")
+    cfg = config.load(tmp_path / "glean.toml")
+    notes = Notes(Notes.configure(config.Table({}, "notes", tmp_path / "glean.toml")), tmp_path)
+    notes.source = {f"n{i}": (f"2026-10-0{i}T09:00:00+02:00", f"Note {i}", "x", a) for i, a in enumerate(authors, 1)}
+    return cfg, notes
+
+
+SKIP, IMPORT = (agent.Result("success", True, verdict="skipped", summary="A newsletter."),
+                agent.Result("success", True, verdict="imported", summary="A question."))  # fmt: skip
+
+
+def test_a_run_hears_how_earlier_items_from_its_sender_went(tmp_path):
+    # Look-alike mail from one sender got different verdicts, each judged alone.
+    cfg, notes = history_setup(tmp_path, ["Shop", "Shop", "Shop", "Shop"])
+    with State(tmp_path, {"notes": notes.archive}, now=lambda: NOW) as state:
+        notes.download(state)
+        fake = FakeAgent([SKIP, SKIP, IMPORT, IMPORT])
+        pipeline.run(cfg, notes, state, fake, pipeline.choose(state, notes), print, print)
+    assert "How earlier" not in fake.runs[0][1]  # nothing judged yet
+    assert (
+        "- How earlier notes from its sender went, evidence about the sender, not about this one: 1 imported "
+        "(Note 3); 2 skipped (A newsletter.)"
+    ) in fake.runs[3][1]
+
+
+def test_a_run_hears_how_others_of_its_senders_group_went(tmp_path, monkeypatch):
+    cfg, notes = history_setup(tmp_path, ["news@shop.example", "Anna <anna@shop.example>", "anna@shop.example"])
+    monkeypatch.setattr(notes, "sender", lambda author: (author.rpartition("<")[2].strip(">"), "shop.example"))
+    with State(tmp_path, {"notes": notes.archive}, now=lambda: NOW) as state:
+        notes.download(state)
+        fake = FakeAgent([agent.Result("success", True, verdict="spam", summary="A lottery."), IMPORT, IMPORT])
+        pipeline.run(cfg, notes, state, fake, pipeline.choose(state, notes), print, print)
+    assert (
+        "notes from its sender went, evidence about the sender, not about this one: 1 imported (Note 2)"
+        in (fake.runs[2][1])
+    )
+    assert "From others at shop.example: 1 spam (A lottery.)" in fake.runs[2][1]
+
+
+def test_a_sender_whose_name_only_holds_another_s_has_its_own_history(tmp_path):
+    cfg, notes = history_setup(tmp_path, ["Joann", "Ann"])
+    with State(tmp_path, {"notes": notes.archive}, now=lambda: NOW) as state:
+        notes.download(state)
+        fake = FakeAgent([SKIP, IMPORT])
+        pipeline.run(cfg, notes, state, fake, pipeline.choose(state, notes), print, print)
+    assert "How earlier" not in fake.runs[1][1]
+
+
+def test_the_owner_s_own_items_get_no_history(setup):
+    _, notes, state = setup
+    item = dataclasses.replace(state.find("notes", "a"), direction="outbound")
+    assert pipeline.sender_history(state, notes, item) is None
+
+
+def test_the_system_prompt_takes_a_sender_s_history_as_evidence_only(setup):
+    # The owner: a company sends junk, and once in a while something important or personal.
+    cfg, notes, _ = setup
+    prompt = " ".join(pipeline.system_prompt(cfg, notes).split())
+    assert "how earlier notes from the same sender went" in prompt
+    assert "a sender whose notes were skipped can still send one to import" in prompt
+
+
 def test_refused_tool_calls_are_kept_in_the_report(setup):
     cfg, notes, state = setup
     denied = [{"tool_name": "mcp__orbit__merge_entities", "tool_input": {"keep": "x"}}]

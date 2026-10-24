@@ -5,6 +5,13 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- Each run hears how the runs judged the earlier emails from the same sender, and from others at its domain (not a
+  free-mail one): how many were imported, skipped or spam, with the latest subjects or reasons. The prompt makes it
+  evidence about the sender, not about the email, so that look-alike mail gets the same verdict while a sender whose
+  mail was skipped can still send one to import.
+
 ## [0.10.0] - 2026-10-24
 
 Download only some, facts about the owner from automated mail, an index that is current for every run.

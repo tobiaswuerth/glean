@@ -398,6 +398,17 @@ class State:
                 )
         return self._again(item)
 
+    def judged(self, item, key):
+        """(author, title, status, reason) of the other items of the item's source that runs imported or skipped and
+        whose author has `key` in it, in any case; the latest first."""
+        return self.db.execute(
+            f"SELECT m.author, m.title, o.status, o.reason FROM {self._of(item.source)}.items m "
+            "JOIN main.outcomes o ON o.source = ? AND o.item = m.id "
+            "WHERE m.id != ? AND o.status IN ('done', 'skipped') AND instr(lower(m.author), ?) > 0 "
+            "ORDER BY o.processed_at DESC",
+            (item.source, item.id, key.casefold()),
+        ).fetchall()
+
     def runs(self, item):
         return [
             dict(r)

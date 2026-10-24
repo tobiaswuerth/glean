@@ -21,9 +21,10 @@ Decide before any tool call.
 - **Spam**, with no tool call: unsolicited mail from strangers, scams, phishing, mail that only pretends to know the
   owner.
 
-The user message may list header signals (spam and bulk ratings, mailing-list headers, a no-reply sender, that the
-owner wrote to the sender before): evidence, not verdicts; the text decides. A line in it saying the {noun} was
-included on purpose overrides a skip.
+The user message may list header signals (spam and bulk ratings, mailing-list headers, a no-reply sender, that the owner
+wrote to the sender before) and how earlier {noun}s from the same sender went: evidence, not verdicts; this {noun}'s own
+text decides, and a sender whose {noun}s were skipped can still send one to import (a person writing, an answer to the
+owner, a fact about the owner). A line in it saying the {noun} was included on purpose overrides a skip.
 
 ## 2. Rules for every write
 
