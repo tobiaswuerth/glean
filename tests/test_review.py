@@ -121,7 +121,7 @@ def test_a_review_leaves_imported_automated_mail_that_settles_a_fact_about_the_o
     # The importer imports such mail on purpose; calling it a wrong verdict would only import it again.
     notes = type("Connector", (), {"noun": "email"})()
     prompt = " ".join(review.system_prompt(notes, 100, "2026-10-23").split())
-    assert "one imported that is automated mail and settles no lasting fact about the owner" in prompt
+    assert "automated mail and settles no lasting fact about the owner (an application, a registration" in prompt
 
 
 def test_a_review_renames_a_note_to_how_the_person_writes_their_name():
