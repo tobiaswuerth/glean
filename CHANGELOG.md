@@ -7,6 +7,10 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- The import prompt closes the open tasks an email settles before it makes new ones, with the signs the reviews kept
+  finding: the answer came, a reply or thank-you shows the owner did it, a later step shows an earlier one took place
+  (an offer after the interview), the case was closed, it was declined or no longer applies. On a new benchmark of
+  complete threads, settled tasks found 0.42 → 0.50, task precision 0.84 → 0.89, runs sent back 15 → 6 (two runs each).
 - The review looks up the name of a person named after an address handle: it searches sift for the address (another
   email, a CC list or a newsletter often names the person) before it renames the note or leaves it.
 
