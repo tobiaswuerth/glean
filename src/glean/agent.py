@@ -1,6 +1,8 @@
-"""One agent run per item: a new `claude -p` process with a fresh context, whose only tools are orbit's reading and
-writing tools and sift's search and reindex. The run is sandboxed by Claude Code's own flags, and checked: each run's
-first event lists the tools and servers it really has, and a run with anything else is stopped before it acts."""
+"""Agent runs, each a new `claude -p` process with a fresh context: per item, a first look with no tools but its
+answer, which decides whether to import it, then, if so, an import, whose only tools are orbit's reading and writing
+tools and sift's search and reindex; per batch, a review. Each run is sandboxed by Claude Code's own flags, and
+checked: its first event lists the tools and servers it really has, and a run with anything else is stopped before it
+acts."""
 
 import json
 import queue
@@ -10,6 +12,7 @@ import sys
 import tempfile
 import threading
 import time
+from collections.abc import Callable
 from contextlib import suppress
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -43,11 +46,29 @@ REVIEW_TOOLS = (
     "link_by_domain",
     "lint_vault",
     "settle_review",
+    "retract_observation",
 )  # a review fixes what imports wrote and acts on the owner's answers; it records no new interactions or tasks
 SERVERS = ("orbit", "sift")
 ANSWER = "StructuredOutput"  # the tool Claude Code gives a run whose answer has a schema; it changes nothing
+TRIAGED = ("import", "skipped", "spam")
+TRIAGE_SCHEMA = {  # a first look's answer
+    "type": "object",
+    "properties": {
+        "outcome": {
+            "type": "string",
+            "enum": list(TRIAGED),
+            "description": "import (a later run records it); skipped (automated mail, nothing to record); spam "
+            "(unsolicited, a scam or phishing)",
+        },
+        "reason": {
+            "type": "string",
+            "description": "What it is, or why it is skipped, in one short line, e.g. 'a price alert from a shop'.",
+        },
+    },
+    "required": ["outcome", "reason"],
+}
 VERDICTS = ("imported", "already_imported", "skipped", "spam")
-SCHEMA = {  # the run's answer
+SCHEMA = {  # an import's answer
     "type": "object",
     "properties": {
         "outcome": {
@@ -67,8 +88,16 @@ REVIEW_SCHEMA = {  # a review's answer
         "report": {"type": "string", "description": "What you checked, found and fixed, in Markdown, for the owner."},
         "reimport": {
             "type": "array",
-            "items": {"type": "string"},
-            "description": "The ids of items to import again: skipped though a person wrote them, or imported wrongly.",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "string", "description": "The item's id, from its digest's heading."},
+                    "why": {"type": "string", "description": "Why, in a line: who wrote it, what it settles."},
+                },
+                "required": ["id", "why"],
+            },
+            "description": "The items to import again: skipped though a person wrote them or they settle a lasting "
+            "fact about the owner, or imported wrongly. They are imported without a first look.",
         },
         "questions": {
             "type": "array",
@@ -85,20 +114,50 @@ REVIEW_SCHEMA = {  # a review's answer
 }
 
 
+FOLLOWUP = (
+    "glean checked your import, and this is left to do:\n{problems}\n\nDo it with the tools, then give your answer "
+    "again. For anything you leave, say in the report why."
+)
+
+
+def _nothing_left(events, answer, addresses):
+    """What a first look leaves to do besides its answer: nothing, as it does nothing."""
+    return []
+
+
 @dataclass(frozen=True)
 class Role:
-    """A kind of run: the tools it may use, its answer, orbit's endpoint for it, its model, and its limits."""
+    """A kind of run: the tools it may use, its answer, the servers it has and orbit's endpoint for it, its model,
+    its limits, and what glean checks after its answer: a run that left something to do is sent back with
+    `followup`."""
 
     allowed: tuple[str, ...]
     schema: dict
-    orbit: str  # orbit's endpoint: /mcp/write without upkeep, /mcp with it
+    orbit: str | None  # orbit's endpoint: /mcp/write without upkeep, /mcp with it
     model: str = "model"  # the [agent] setting that names its model
     scale: int = 1  # its turns, budget and time, in [agent]'s limits per item
+    servers: tuple[str, ...] = SERVERS
+    check: Callable | None = None  # (events, answer, addresses) -> what is left to do; None: nothing is checked
+    followup: str = FOLLOWUP
+
+    @property
+    def verdicts(self):
+        return tuple(self.schema["properties"].get("outcome", {}).get("enum", ()))
+
+    @property
+    def no_answer(self):
+        """What a run that gave no answer is told."""
+        *first, last = self.schema["required"]
+        return f"no answer came: give it with the {ANSWER} tool, its {', '.join(first)} and {last}"
 
 
-IMPORT = Role(ALLOWED, SCHEMA, "/mcp/write")
+TRIAGE = Role(
+    (), TRIAGE_SCHEMA, None, servers=(), check=_nothing_left,
+    followup="glean checked your answer, and this is left to do:\n{problems}",
+)  # fmt: skip
+IMPORT = Role(ALLOWED, SCHEMA, "/mcp/write", model="import_model", check=checks.problems)
 REVIEW = Role(
-    (*(f"mcp__orbit__{t}" for t in REVIEW_TOOLS), "mcp__sift__query", "mcp__sift__search"),
+    (*(f"mcp__orbit__{t}" for t in REVIEW_TOOLS), "mcp__sift__query", "mcp__sift__search", "mcp__sift__get"),
     REVIEW_SCHEMA,
     "/mcp",
     model="review_model",
@@ -109,16 +168,12 @@ PROBE_SECONDS = 60  # how long the check before a batch may take to start
 EXIT_SECONDS = 15  # how long a run that gave its result may take to exit
 FOLLOWUPS = 2  # how often glean sends a run back with what its checks found left to do
 POLICY = "anthropic.com/legal/aup"  # in the text of a result the model's usage policy refused: what it read, not glean
-NO_ANSWER = f"no answer came: give it with the {ANSWER} tool, its outcome, reason and report"
-FOLLOWUP = (
-    "glean checked your import, and this is left to do:\n{problems}\n\nDo it with the tools, then give your answer "
-    "again. For anything you leave, say in the report why."
-)
 
 
 @dataclass
 class Result:
-    outcome: str  # success, error_max_turns, error_max_budget_usd, error_during_execution, timeout, refused, crashed
+    outcome: str  # success, error_max_turns, error_max_budget_usd, error_during_execution, timeout, refused, crashed,
+    # policy_refusal, stopped (never began)
     ok: bool
     report: str = ""
     reason: str | None = None
@@ -181,24 +236,26 @@ class Agent:
         self.base = command or [str(find_claude(cfg.agent.claude))]  # tests run a fake claude here
         self.disallowed = None  # the servers' other tools, known after prepare()
         self.live, self.lock = set(), threading.Lock()  # the processes running, which stop() ends
-        self.check = checks.problems if role is IMPORT else None  # what an answer leaves to do: it goes back
-        self.orbit_url = endpoint(cfg.orbit_url, role.orbit)
+        self.stopped = False  # once stopped, no run starts
+        self.check = role.check  # what an answer leaves to do: it goes back
+        self.orbit_url = endpoint(cfg.orbit_url, role.orbit) if role.orbit else None
 
     def stop(self):
-        """End every run in progress, as Ctrl+C does with several at once: each then ends without a result."""
+        """End every run in progress, as Ctrl+C does with several at once: each then ends without a result; and start
+        no other."""
         with self.lock:
+            self.stopped = True
             running = list(self.live)
         for proc in running:
             with suppress(OSError):
                 proc.kill()
 
+    def _urls(self):
+        return {"orbit": self.orbit_url, "sift": self.cfg.sift.url}
+
     def mcp_config(self):
-        return {
-            "mcpServers": {
-                "orbit": {"type": "http", "url": self.orbit_url},
-                "sift": {"type": "http", "url": self.cfg.sift.url},
-            }
-        }
+        urls = self._urls()
+        return {"mcpServers": {name: {"type": "http", "url": urls[name]} for name in self.role.servers}}
 
     def command(self, conf):
         a, scale = self.cfg.agent, self.role.scale
@@ -229,8 +286,8 @@ class Agent:
         return cmd
 
     def prepare(self):
-        """Check, before a batch, that Claude Code starts with both servers connected and every allowed tool there,
-        and learn the servers' other tools, which every run then hides. Returns the tools a run will have."""
+        """Check, before a batch, that Claude Code starts with the role's servers connected and every allowed tool
+        there, and learn the servers' other tools, which every run then hides. Returns the tools a run will have."""
         events, _ = self._start("Reply with OK.", "This run only checks the setup.", None, until_init=True)
         init = events.get("init")
         if init is None:
@@ -246,8 +303,8 @@ class Agent:
 
     def _check_servers(self, init):
         status = {s.get("name"): s.get("status") for s in init.get("mcp_servers") or []}
-        urls = {"orbit": self.orbit_url, "sift": self.cfg.sift.url}
-        for name in SERVERS:
+        urls = self._urls()
+        for name in self.role.servers:
             if status.get(name) != "connected":
                 raise GleanError(
                     f"{name} isn't connected ({status.get(name) or 'missing'}): is `{name} serve` running at "
@@ -279,6 +336,9 @@ class Agent:
         timeout, or (until_init) its first event. An answer in which `check` finds things left to do goes back to the
         run, in the same session, as a message that lists them, at most FOLLOWUPS times. Returns ({"init": …,
         "error": …}, Result)."""
+        with self.lock:
+            if self.stopped:
+                return {}, Result("stopped", False, reason="glean stopped the batch before this run began")
         log = Path(transcript).open("ab") if transcript else None  # noqa: SIM115 (closed below, after the loop)
         try:
             proc = self.popen(cmd, cwd=cwd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -288,6 +348,9 @@ class Agent:
             raise GleanError(f"can't start Claude Code ({cmd[0]}): {e}") from None
         with self.lock:
             self.live.add(proc)
+            if self.stopped:  # stopped while it started
+                with suppress(OSError):
+                    proc.kill()
         lines, errors = queue.Queue(), []
         threads = [
             threading.Thread(target=_send, args=(proc.stdin, message), daemon=True),
@@ -327,11 +390,11 @@ class Agent:
                     if refusal := self._refusal(event):
                         result = Result("refused", False, reason=refusal)
                 elif event.get("type") == "result":
-                    current = _merged(earlier, _result(event))
+                    current = _merged(earlier, _result(event, self.role.verdicts))
                     left = self._left(check, events, event, current) if check and current.ok else []
                     if left and current.followups < FOLLOWUPS:
                         current.sent_back.append(left)
-                        message = FOLLOWUP.format(problems="\n".join(f"- {p}" for p in left))
+                        message = self.role.followup.format(problems="\n".join(f"- {p}" for p in left))
                         if log:  # Claude Code doesn't echo what it reads: the transcript keeps glean's part
                             log.write(_line(message, glean="followup"))
                         threads.append(threading.Thread(target=_send, args=(proc.stdin, message), daemon=True))
@@ -354,11 +417,10 @@ class Agent:
                 self.live.discard(proc)
         return seen, result
 
-    @staticmethod
-    def _left(check, events, event, result):
+    def _left(self, check, events, event, result):
         """What an answered run leaves to do: the answer itself, if it came without its schema, or what the checks
         find."""
-        return check(events, event.get("structured_output")) if result.verdict else [NO_ANSWER]
+        return check(events, event.get("structured_output")) if result.verdict else [self.role.no_answer]
 
     def _refusal(self, init):
         """Why a run must not go on, from its first event: other tools than allowed, or a server not connected."""
@@ -373,7 +435,7 @@ class Agent:
         return None
 
 
-def _result(event):
+def _result(event, verdicts):
     subtype = event.get("subtype") or "unknown"
     if event.get("is_error") and POLICY in str(event.get("result") or ""):
         subtype = "policy_refusal"
@@ -384,7 +446,7 @@ def _result(event):
     errors = event.get("errors") or []
     reason = None if ok else "; ".join(str(e) for e in errors) or report.strip()[:500] or subtype
     return Result(
-        verdict=answer.get("outcome") if answer.get("outcome") in VERDICTS else None,
+        verdict=answer.get("outcome") if answer.get("outcome") in verdicts else None,
         summary=answer.get("reason"),
         outcome=subtype,
         ok=ok,

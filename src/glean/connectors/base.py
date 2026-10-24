@@ -110,4 +110,8 @@ class Connector(ABC):
 
     @abstractmethod
     def instructions(self):
-        """What the agent does with an item of this kind: the source's part of the agent's system prompt."""
+        """What the agent does with an item of this kind: the source's part of the import's system prompt."""
+
+    @abstractmethod
+    def triage_instructions(self):
+        """What tells an item of this kind worth importing: the source's part of the first look's system prompt."""

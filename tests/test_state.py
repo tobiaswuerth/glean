@@ -204,8 +204,38 @@ def test_a_stopped_run_leaves_the_status(state):
 def test_a_reset_item_is_new_and_keeps_its_runs(state):
     done = finish(state, state.add(item(status="skipped", reason="bulk: List-Id"), "Inbox", "17"))
     again = state.reset(done)
-    assert (again.status, again.reason, again.attempts) == ("new", None, 1)  # its next run is a retry
+    assert (again.status, again.reason, again.attempts, again.wanted) == ("new", None, 1, None)  # a retry
     assert len(state.runs(again)) == 1
+
+
+def test_an_item_reset_to_be_imported_keeps_why_until_a_run_records_it(state):
+    # The review named an email a person wrote, which the first look had skipped: judged again, it was skipped again.
+    skipped = finish(state, state.add(item(), "Inbox", "17"), status="skipped", reason="agent: skipped: a notice")
+    wanted = state.reset(skipped, "the review: Anna Keller wrote it")
+    assert (wanted.status, wanted.wanted) == ("new", "the review: Anna Keller wrote it")
+    stopped = finish(state, wanted, status=None, reason="stopped with Ctrl+C")
+    assert stopped.wanted == "the review: Anna Keller wrote it"
+    failed = finish(state, stopped, status="failed", reason="timeout")
+    assert failed.wanted == "the review: Anna Keller wrote it"  # tried again with --retry-failed, still wanted
+    assert finish(state, failed).wanted is None
+    assert state.reset(state.reset(failed, "x")).wanted is None  # a plain reset judges it afresh
+
+
+def test_a_runs_db_of_glean_0_12_gains_what_is_new(tmp_path):
+    db = sqlite3.connect(tmp_path / "runs.db")
+    db.executescript(
+        "CREATE TABLE outcomes (source TEXT NOT NULL, item TEXT NOT NULL, status TEXT, reason TEXT, attempts INTEGER "
+        "NOT NULL DEFAULT 0, cost_usd REAL NOT NULL DEFAULT 0, report TEXT, processed_at TEXT, PRIMARY KEY (source, "
+        "item)); INSERT INTO outcomes VALUES ('mail', 'x', 'done', NULL, 1, 0.5, 'r.md', '2026-10-01');"
+        "PRAGMA user_version = 1;"
+    )
+    db.close()
+    with open_state(tmp_path) as s:
+        added = s.add(item(), "Inbox", "17")
+        assert s.reset(added, "the owner").wanted == "the owner"
+        assert tuple(s.db.execute("SELECT status, cost_usd FROM outcomes WHERE item = 'x'").fetchone()) == ("done", 0.5)
+    with open_state(tmp_path) as s:  # once only
+        assert s.db.execute("PRAGMA main.user_version").fetchone()[0] == 2
 
 
 def test_an_ignored_item_stays_ignored_whatever_its_runs_made_of_it(state):

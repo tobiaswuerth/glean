@@ -27,17 +27,19 @@ updates people, organizations and tasks, and makes the item searchable. Neither 
   destructive ones (merge, rename). Every run's first event lists the tools it really has; a run with anything else
   is stopped before it acts. Items are treated as data, never as instructions
   ([how](https://github.com/tobiaswuerth/glean/blob/main/docs/how-it-works.md#the-agent-run)).
-- **Spam and mass mail stay out, judged by the agent.** What Outlook.com's filters and the headers say (spam and bulk
-  ratings, mailing-list headers, no-reply senders, whether you wrote to the sender, how earlier mail from the sender was
-  judged) goes to the agent as evidence, not as rules, since rules skipped people too; it skips automated mail and spam
-  without a tool call, for about $0.002 with Haiku, except mail that settles a fact about you (a registration, an
-  admission, a service that starts or ends), which goes on your note. Only senders you list are skipped without a run.
+- **A first look decides, a stronger model imports.** Haiku takes a first look at each email, with no tools but its
+  answer: what Outlook.com's filters and the headers say (spam and bulk ratings, mailing-list headers, no-reply
+  senders, whether you wrote to the sender, how earlier mail from the sender was judged) goes to it as evidence, not as
+  rules, since rules skipped people too. It skips automated mail and spam, for about a fifth of a cent each, except mail
+  that settles a fact about you (a registration, an admission, a service that starts or ends), which goes on your note.
+  What you wrote, and what it judges worth recording, Sonnet imports. Only senders you list are skipped without a run.
 - **Runs that leave work undone are sent back.** glean checks each import's tool calls: the interaction logged,
   every unknown person and organization taken up, sift asked to index, no failed call dropped. What is left goes back
   to the agent in the same session, up to twice, and into the report. A batch whose runs keep going wrong stops.
-- **A second look by a stronger model.** After a run, one Opus review per 100 imports reads what they wrote: it merges
-  proven duplicates, links people to the organization of their address, closes tasks later emails settled, corrects
-  misplaced tasks and fields, sends wrongly judged emails back to be imported again, and suggests changes to the
+- **A second look by the strongest model.** While the rest of a run is imported, one Opus review per 100 emails reads
+  what their runs wrote, and the email itself where that leaves it in doubt: it merges proven duplicates, links people
+  to the organization of their address, closes tasks later emails settled, corrects misplaced tasks and fields, takes
+  back facts that aren't so, sends wrongly judged emails back to be imported, with why, and suggests changes to the
   instructions (about $1 per 100 emails).
 - **Questions only you can answer.** The review asks a few (who is this to you? is this your bank?) as notes in
   orbit's review queue. You tick Yes or No, or type the answer into its column in Obsidian, whenever suits you; your
@@ -59,10 +61,10 @@ updates people, organizations and tasks, and makes the item searchable. Neither 
 - Python 3.11 or newer.
 - [Claude Code](https://claude.com/claude-code) 2.1.290 or newer, signed in (`claude auth status`). On Windows, the
   native installer's `claude.exe`.
-- [orbit](https://github.com/tobiaswuerth/orbit) 0.8.0 or newer and [sift](https://github.com/tobiaswuerth/sift) 1.3.1
-  or newer (1.3.0 doesn't index the attachments the agent gives it), each serving MCP over HTTP: `orbit serve <vault>`
-  (port 8775) and `sift serve` (port 8765). Give orbit's vault your addresses when you create it, with
-  `orbit init <vault> --email you@example.com`.
+- [orbit](https://github.com/tobiaswuerth/orbit) 0.10.0 or newer and [sift](https://github.com/tobiaswuerth/sift) 1.5.0
+  or newer (for the review, which takes back wrong facts and reads emails by their path), each serving MCP over HTTP:
+  `orbit serve <vault>` (port 8775) and `sift serve` (port 8765). Give orbit's vault your addresses when you create it,
+  with `orbit init <vault> --email you@example.com`.
 - For an Outlook.com or Hotmail mailbox: an app registered in Microsoft Entra (free, about five minutes; step 1
   below), and IMAP turned on in Outlook's settings.
 
@@ -142,11 +144,11 @@ a `.siftignore`, since sift reads each email's Markdown document. It finds the v
 glean mail download               # fetch what is new; the first time, everything
 glean mail download --oldest 500  # only the 500 oldest of it; the next download takes the rest
 glean mail list --oldest 20       # the 20 oldest not yet imported, in the order run takes them
-glean mail run --oldest 20        # import them, oldest first, one agent run each, then review what they wrote
+glean mail run --oldest 20        # a first look at each, oldest first, an import of those worth it, and reviews
 glean mail review --latest 50     # review the 50 latest imports again
 glean mail show <id>              # one email: its state, files, and the agent's report
 glean mail ignore <id>            # never import it
-glean mail reset <id>             # import it again
+glean mail reset <id>             # import it again, without a first look
 glean status                      # counts per source and status, the agents' cost so far
 ```
 
@@ -154,8 +156,9 @@ glean status                      # counts per source and status, the agents' co
 the older ones after the newer, so tasks they open and settle may come out of order), ids, `--parallel N` to keep N
 agents busy (emails that share people, a company or a thread go one after the other where others can run meanwhile),
 `--retry-failed` for emails whose run failed, `--include-skipped`
-for those skipped before, and `--dry-run` to write the documents and show what the agent would get, without running
-it. Each run ends `done`, `skipped` (the agent found it automated mail or spam, and says why) or `failed`.
+for those skipped before (imported without a first look), and `--dry-run` to write the documents and show what the
+first run of each would get, without running it. Each email ends `done`, `skipped` (the first look or the import found
+it automated mail or spam, and says why) or `failed`.
 
 **To import everything again**, delete `runs.db` and `runs/` in glean's home: every email is then as it was
 downloaded, and nothing is downloaded again. For a fresh vault too, make a new one with `orbit init`.
@@ -173,9 +176,10 @@ each version. The settings:
 
 | Setting | Default | |
 |---|---|---|
-| `[agent] model` | `haiku` | the model of each run: `haiku`, `sonnet`, `opus` or a full model id. In runs of 100 real emails each, Haiku cost $0.27 and Sonnet $4.08 |
+| `[agent] model` | `haiku` | the first look at each email: import, skip or spam, by its text alone; `haiku`, `sonnet`, `opus` or a full model id |
+| `[agent] import_model` | `sonnet` | imports what the first look judged worth recording |
 | `[agent] parallel` | 1 | agent runs at once; `run --parallel` for one run |
-| `[agent] review_every`, `review_model` | 100, `opus` | after a run, one review of every this many imports, by this model; 0: none, `run --no-review` for one run |
+| `[agent] review_every`, `review_model` | 100, `opus` | while a run goes on, one review of every this many emails, by this model; 0: none, `run --no-review` for one run |
 | `[agent] max_turns`, `timeout_minutes`, `max_budget_usd` | 60, 5, 1.0 | limits per item; a run that hits one fails, and is retried with `--retry-failed` |
 | `[orbit] url` | `…:8775/mcp/write` | orbit's tools without merges, renames and lint |
 | `[orbit] vault` | asked from orbit | orbit's vault, for its sift collection |

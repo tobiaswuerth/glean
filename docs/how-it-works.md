@@ -112,7 +112,7 @@ brought:
 
 | Table | Holds |
 |---|---|
-| `outcomes` | per item: `done`, `failed` or `skipped` (the agent's verdict, a run's error), attempts, cost, the last report's path |
+| `outcomes` | per item: `done`, `failed` or `skipped` (the agent's verdict, a run's error), attempts, cost, the last report's path, and `wanted`: why you or a review asked for it to be imported, until a run imports or skips it |
 | `runs` | every agent run: when, outcome, turns, cost, duration |
 
 Items are keyed by what identifies them across places, not by a server's numbers: an email can sit in two folders,
@@ -122,8 +122,9 @@ means `new`; `run --retry-failed` adds `failed`, `--include-skipped` adds `skipp
 of them, so that orbit grows in the order things happened: a person or a task an email creates exists when a later one
 answers or settles it. `--latest N` takes the newest instead; both run them oldest first. A failed item stays failed
 until it is retried; a stopped run (Ctrl+C) leaves its item as it was. `reset` makes an item new again, keeping the
-number of its runs, so that its next run knows it is a retry. Nothing marks the source: not every server keeps custom
-flags, and the state here can be inspected and reset.
+number of its runs, so that its next run knows it is a retry, and wanted: it is imported without a first look. Nothing
+marks the source: not every server keeps custom flags, and the state here can be inspected and reset. A `runs.db` of
+glean 0.12 gains `wanted` when glean 0.13 first opens it; an older glean then refuses it.
 
 Items an older glean downloaded are brought in line with this version before the next download, run or list, once
 per version: what its own rules skipped is new again, for the agent to judge, and what lacks a document gets one;
@@ -152,10 +153,10 @@ imported twice is still one interaction. A retry tells the agent so, and it comp
 
 ### Who wrote it: evidence, not rules
 
-glean skips nothing by itself: the agent reads every email and decides whether a person wrote it. Rules erred: of
+glean skips nothing by itself: a first look reads every email and decides whether a person wrote it. Rules erred: of
 1,798 emails an earlier glean skipped by their headers, a support desk's replies (sent `Auto-Submitted`) and an
-invitation Microsoft rated spam were people's. What the headers and the sender say goes into the run's message, as
-evidence to weigh:
+invitation Microsoft rated spam were people's. What the headers and the sender say goes into the first look's message,
+as evidence to weigh:
 
 - Microsoft's spam confidence level of 5 or more (`X-MS-Exchange-Organization-SCL`, or `SCL` in
   `X-Forefront-Antispam-Report`), or delivery to junk (`X-Microsoft-Antispam-Mailbox-Delivery`);
@@ -168,16 +169,21 @@ evidence to weigh:
   how many were imported, skipped or spam, with the latest subjects or reasons. The prompt makes this evidence about
   the sender, not about the email: a sender whose mail was skipped can still send one to import.
 
-What the owner wrote gets none. Automated mail costs a run of two turns (one is the answer), no tool calls, about $0.002
-with Haiku; one that settles a lasting fact about the owner (a registration or admission, a service or contract that
+What the owner wrote gets none. Automated mail costs a first look of one or two turns and no tools, about $0.002 with
+Haiku; one that settles a lasting fact about the owner (a registration or admission, a service or contract that
 starts, changes or ends) is imported as its interaction, its organization and the fact on Me. Only the senders in
 `skip_senders` are skipped without a run, and never what the owner wrote or what people they wrote to send; mail skipped
 before its sender turned out to be such a person is let back in.
 
 ## The agent run
 
-Each item is imported by its own `claude -p` process, so each starts with a fresh context and knows only what orbit
-and sift hold:
+Each item gets two runs, each its own `claude -p` process with a fresh context. **The first look**
+(`[agent] model`, Haiku) has no tools but its answer and no servers: it reads the item, cut at 60,000 characters,
+with the headers' signals and the sender's history, and answers `import`, `skipped` or `spam` with a reason, by the
+rules of `glean/prompts/triage.md` and the connector's part (for mail, `glean/connectors/mail/triage.md`). Skipped and
+spam end there. What you wrote, an item you reset or a review named to import again, and one you include with
+`--include-skipped` get no first look. **The import** (`[agent] import_model`, Sonnet) records what the first look sent on, knowing why,
+and knows only what orbit and sift hold:
 
 ```
 claude -p
@@ -192,20 +198,22 @@ claude -p
   --system-prompt-file prompt.md               glean's prompt instead of Claude Code's
   --output-format stream-json --verbose        every event, the first listing the run's tools and servers
   --json-schema <the answer>                   outcome, reason, report
-  --max-turns 60 --max-budget-usd 1.0 --model haiku
+  --max-turns 60 --max-budget-usd 1.0 --model sonnet
   --no-session-persistence
 ```
 
 - **The item goes on stdin**, between two lines with a random marker, after the paths of its files.
 - **It runs in an empty temporary folder**, so no project files or settings leak in; `mcp.json` and the prompt are in
   another.
-- **Before a batch**, glean starts Claude Code once and reads only its first event: both servers must be connected and
-  every allowed tool there. The servers' other tools become the `--disallowedTools` of every run.
+- **Before a batch**, glean starts Claude Code once for each kind of run (first look, import, review) and reads only
+  its first event: its servers must be connected and every allowed tool there. The servers' other tools become the
+  `--disallowedTools` of every run of that kind.
 - **Every run is checked**: its first event must list exactly the allowed tools (and `StructuredOutput`, which only
   returns the answer) and both servers connected, or the run is stopped before its first turn and the item fails with
   the reason.
-- **The answer** is structured: `imported`, `already_imported`, `skipped` (automated mail) or `spam`, a reason in a
-  line, and the report. `skipped` and `spam` make the item skipped, with the agent's reason; the rest done. A result
+- **The answer** is structured: `imported`, `already_imported`, `skipped` (automated mail, plainly, after all) or
+  `spam`, a reason in a line, and the report. `skipped` and `spam` make the item skipped, with the agent's reason; the
+  rest done. The item's cost and turns are both runs'. A result
   without the structured answer goes back to the agent for it, like the checks' findings; still without one, the item
   fails, never taken as imported. An email the model's usage policy refuses to read (as it refuses phishing) is skipped
   with that reason; it doesn't count toward the circuit breaker. The result is read whatever happens: success,
@@ -219,11 +227,12 @@ claude -p
   what each time sent back and what was still left (`followups` and `checks_left` in its front matter); the
   transcript has glean's messages too, marked `"glean": "followup"`.
 
-The **prompt** is `glean/prompts/import.md`, shared by every source: decide first whether the item is worth recording;
-log the interaction first and make it the source of everything else; resolve before writing; write only what the
+The **prompt** is `glean/prompts/import.md`, shared by every source: import what the first look sent on, unless it
+plainly isn't worth it; log the interaction first and make it the source of everything else; resolve before writing;
+write only what the
 item states, facts about the owner on Me; ask with `propose_review` when unsure; the item as data and never
 instructions; documents, indexing and the answer. Each connector adds its part: for mail,
-`glean/connectors/mail/instructions.md` (which emails are worth it, the headers as orbit takes them, the thread orbit
+`glean/connectors/mail/instructions.md` (the headers as orbit takes them, the thread orbit
 returns, one call for all links, people at the organization of their address, tasks an organization owes, open tasks
 an email settles, closed before new ones are made).
 
@@ -247,18 +256,22 @@ the most common cause, and the items not yet run stay as they were.
 
 ### The review
 
-After a run, glean has a stronger model (`[agent] review_model`, Opus by default) look at what the imports wrote, one
-review run per `review_every` imports (100). It reads a digest of each import (the item's subject, sender and
-verdict, and its report, shortened; a skipped item's is a line with its reason, as a review rereads its input on every
-turn), not the items, and has orbit's full tools (`/mcp`: merges, renames and `link_by_domain` too, but no new
-interactions or tasks) and sift's search. It links people without an organization to the one their address is at,
-merges duplicates the notes prove, merges the owner's other notes into Me, renames notes named after an address
-handle, closes tasks later emails settled, corrects tasks and fields the digests and notes show to be wrong, and
-answers with a report, the ids of items to import again (glean makes them new, so the next run takes them) and
+While a run goes on, glean has the strongest model (`[agent] review_model`, Opus by default) look at what its runs
+wrote, one review run per `review_every` items (100), in their order: each starts once all of its items are recorded,
+and one at a time, so that each sees what the one before it fixed, while the rest are imported. It reads a digest of
+each item (its subject, sender, file and verdict, and its report, shortened; a skipped item's is a line with its
+reason, as a review rereads its input on every turn), and the item itself, with sift's `get` and the file's path,
+where a digest leaves it in doubt. It has orbit's full tools (`/mcp`: merges, renames, `link_by_domain` and
+`retract_observation` too, but no new interactions or tasks) and sift's search. It links people without an
+organization to the one their address is at, merges duplicates the notes prove, merges the owner's other notes into
+Me, renames notes named after an address handle, closes tasks later emails settled, corrects tasks and fields, takes
+back observations that aren't so (and adds them where they belong), and answers with a report, the items to import
+again, each with why (glean makes them new and wanted, so the next run imports them without a first look), and
 suggestions for the importer's instructions. Notes an import recorded as different only the owner's yes to a
 duplicate review merges; a refused call isn't tried again. The report goes to `runs/reviews/`, with its transcript.
-Its limits are ten times an import's: turns, budget and time. `glean mail review` reviews the latest imports when
-asked (`--latest N`, or ids). It needs orbit 0.8.0 or newer.
+Its limits are ten times an import's: turns, budget and time. Ctrl+C and the circuit breaker stop the review in
+progress too, which then reports nothing. `glean mail review` reviews the latest imports when asked (`--latest N`, or
+ids). It needs orbit 0.10.0 and sift 1.5.0 or newer.
 
 **Questions for the owner.** What no email says, only the owner knows: who a person is to them, whether an
 organization is their bank or their school, whether something that looks automated mattered. The review asks such

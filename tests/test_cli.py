@@ -81,7 +81,7 @@ def test_the_whole_flow(mail_home, capsys):
     assert out.startswith("done    ")
     assert len(out.splitlines()) == 2
     assert "2 done" in err
-    assert err.index("2 done") < err.index("reviewing 2 imports with opus")  # then one review, by a stronger model
+    assert err.index("reviewing 2 imports with opus") < err.index("2 done")  # reviewed in the run, by a stronger model
     assert "reviewed 2 imports ($0.12): 0 to import again;" in err
     code, out, _ = run(capsys, "mail", "list", "--status", "done")
     first = out.splitlines()[-1].split()[0]
@@ -95,13 +95,17 @@ def test_the_whole_flow(mail_home, capsys):
     assert out.startswith("ignored ")
     code, out, _ = run(capsys, "mail", "reset", "caf1234@mail.acme.example")
     assert out.startswith("new     ")
+    listed = json.loads(run(capsys, "mail", "list", "--json")[1])
+    assert [i["wanted"] for i in listed] == ["the owner"]  # imported without a first look
 
     code, out, _ = run(capsys, "status")
     assert "4 emails: 1 new, 2 done, 1 skipped" in out
     code, out, _ = run(capsys, "status", "--json")
     status = json.loads(out)
     assert sum(status["sources"]["mail"]["items"].values()) == 4
-    assert status["sources"]["mail"]["cost_usd"] == pytest.approx(0.24)
+    assert status["sources"]["mail"]["cost_usd"] == pytest.approx(
+        0.36
+    )  # a first look and an import, the owner's no look
 
 
 def test_a_download_takes_one_count_above_zero(mail_home, capsys):
@@ -137,7 +141,7 @@ def test_a_dry_run(mail_home, capsys):
     run(capsys, "mail", "download")
     code, out, _ = run(capsys, "mail", "run", "--latest", "1", "--dry-run")
     assert code == 0
-    assert "Here is the next email." in out
+    assert "Here is the next email to record in orbit and sift." in out  # the owner's own: no first look
     assert run(capsys, "mail", "list")[1].count("\n") == 3  # still waiting
 
 
@@ -289,8 +293,9 @@ def test_doctor_when_all_is_well(doctor, capsys):
     assert code == 0, out
     lines = out.splitlines()
     assert all(line.startswith("ok  ") for line in lines)
-    assert any("agent: 18 tools, orbit and sift connected, nothing else" in line for line in lines)
-    assert any("review: 19 tools on orbit's /mcp, merges included" in line for line in lines)
+    assert any("first look: no tools but its answer, no servers" in line for line in lines)
+    assert any("import: 18 tools, orbit and sift connected, nothing else" in line for line in lines)
+    assert any("review: 21 tools on orbit's /mcp, merges included" in line for line in lines)
     assert any("mail: reads .eml files from" in line for line in lines)
     assert any("sift: the collection 'data' holds the mail archive" in line for line in lines)
     assert any("sift: the collection 'crm' holds orbit's vault" in line for line in lines)
@@ -305,21 +310,21 @@ def test_doctor_names_what_is_wrong(doctor, capsys):
     assert "needs 2.1.290+" in out
     assert "!!  claude: not signed in" in out
     assert "!!  sift: nothing answers at http://127.0.0.1:8765/mcp" in out
-    assert "agent:" not in out  # not tried while something else is wrong
+    assert "import:" not in out  # not tried while something else is wrong
 
 
 def test_doctor_with_the_agent_check_failing(doctor, capsys, monkeypatch):
     monkeypatch.setenv("FAKE_CLAUDE", json.dumps({"mode": "missing"}))
     code, out, _ = run(capsys, "doctor")
     assert code == 1
-    assert "!!  agent: the servers lack tools" in out
+    assert "!!  import: the servers lack tools" in out
 
 
 def test_doctor_names_an_orbit_too_old_for_the_review(doctor, capsys, monkeypatch):
-    monkeypatch.setenv("FAKE_CLAUDE", json.dumps({"mode": "old_orbit"}))  # no settle_review: orbit before 0.6
+    monkeypatch.setenv("FAKE_CLAUDE", json.dumps({"mode": "old_orbit"}))  # no retract_observation: before 0.10
     code, out, _ = run(capsys, "doctor")
     assert code == 1
-    assert "!!  review: the servers lack tools glean needs: mcp__orbit__settle_review; update orbit" in out
+    assert "!!  review: the servers lack tools glean needs: mcp__orbit__retract_observation; update orbit" in out
 
 
 def test_doctor_without_a_review_checks_none(doctor, capsys, mail_home):

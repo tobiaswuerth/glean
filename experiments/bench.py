@@ -434,7 +434,8 @@ def run(args):
     bench = args.bench.resolve()
     selection = load(bench)
     cmd = [sys.executable, str(HERE / "replay.py"), "--home", str(selection["home"]),
-           "--ids", *(i["id"] for i in selection["items"]), "--model", args.model, "--parallel", str(args.parallel),
+           "--ids", *(i["id"] for i in selection["items"]), "--model", args.model, "--import-model", args.import_model,
+           "--parallel", str(args.parallel),
            "--dir", str(bench / "runs" / args.name), "--owner", selection["owner"],
            "--owner-name", selection["owner_name"],
            "--port", str(args.port), "--sift-port", str(args.sift_port)]  # fmt: skip
@@ -748,7 +749,8 @@ def main():
     a = sub.add_parser("annotate", help="write the answer key")
     r = sub.add_parser("run", help="import the emails into a new vault with the real agent")
     r.add_argument("--name", required=True, help="the run's name: its folder in runs/")
-    r.add_argument("--model", default="haiku")
+    r.add_argument("--model", default="haiku", help="the first look's model")
+    r.add_argument("--import-model", default="sonnet", help="the model that imports")
     r.add_argument("--orbit", help="the orbit command to run (default: the one on PATH)")
     r.add_argument("--port", type=int, default=8777, help="the replay's orbit port")
     r.add_argument("--sift-port", type=int, default=8779, help="the replay's own sift's port")

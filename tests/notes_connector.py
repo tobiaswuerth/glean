@@ -58,3 +58,6 @@ class Notes(Connector):
 
     def instructions(self):
         return "## Importing a note\n\nLog it."
+
+    def triage_instructions(self):
+        return "## Notes\n\nA note is worth it."

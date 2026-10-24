@@ -84,7 +84,8 @@ def main():
     p.add_argument("--sample", type=int, default=10, help="else this many emails, picked at random")
     p.add_argument("--seed", type=int, default=1)
     p.add_argument("--status", nargs="*", default=[], help="pick only from items with these statuses")
-    p.add_argument("--model", default="sonnet")
+    p.add_argument("--model", default="haiku", help="the first look's model")
+    p.add_argument("--import-model", default="sonnet", help="the model that imports what the first look sends on")
     p.add_argument("--parallel", type=int, default=1)
     p.add_argument("--port", type=int, default=8777)
     p.add_argument("--sift-port", type=int, default=8779, help="the replay's own sift's port")
@@ -111,7 +112,7 @@ def main():
     subprocess.run([orbit, "init", str(vault), *owner], check=True, capture_output=True)
     home.mkdir()
     (home / "glean.toml").write_text(
-        f'[agent]\nmodel = "{args.model}"\nparallel = {args.parallel}\n\n'
+        f'[agent]\nmodel = "{args.model}"\nimport_model = "{args.import_model}"\nparallel = {args.parallel}\n\n'
         + settings(args.port, args.sift_port)
         + f'[mail]\naddress = "{args.owner}"\nmy_addresses = {json.dumps(args.my_addresses)}\n'
         f'eml_folder = "{eml.as_posix()}"\n',

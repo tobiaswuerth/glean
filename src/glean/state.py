@@ -16,7 +16,7 @@ from pathlib import Path
 from . import archive
 from .errors import GleanError
 
-SCHEMA_VERSION = 1  # of mails.db and runs.db, in their user_version
+SCHEMA_VERSION = 2  # of mails.db and runs.db, in their user_version; 2: outcomes.wanted
 ID_LENGTH = 12  # hex digits of an item's short id; longer on a clash
 STATUSES = ("new", "done", "failed", "skipped", "ignored")  # an item's, as the two databases make it
 FOUND = ("new", "skipped", "failed", "ignored")  # what the download, the skip rules or the owner decided
@@ -64,6 +64,7 @@ CREATE TABLE IF NOT EXISTS outcomes (
     cost_usd REAL NOT NULL DEFAULT 0,
     report TEXT,
     processed_at TEXT,
+    wanted TEXT,
     PRIMARY KEY (source, item)
 );
 CREATE TABLE IF NOT EXISTS runs (
@@ -88,11 +89,11 @@ ITEM = """SELECT '{name}' AS source, m.id, m.key, m.date, m.utc, m.title, m.auth
     CASE WHEN o.status IS NULL OR m.status = 'ignored' THEN m.status ELSE o.status END AS status,
     CASE WHEN m.status = 'ignored' OR coalesce(o.status, o.reason) IS NULL THEN m.reason ELSE o.reason END AS reason,
     coalesce(o.attempts, 0) AS attempts, coalesce(o.cost_usd, 0) AS cost_usd, m.document, o.report, m.downloaded_at,
-    o.processed_at
+    o.processed_at, o.wanted
     FROM "{name}".items m LEFT JOIN main.outcomes o ON o.source = '{name}' AND o.item = m.id"""
 ITEM_COLUMNS = [
     "source", "id", "key", "date", "utc", "title", "author", "container", "direction", "path", "sha256", "size",
-    "status", "reason", "attempts", "cost_usd", "document", "report", "downloaded_at", "processed_at",
+    "status", "reason", "attempts", "cost_usd", "document", "report", "downloaded_at", "processed_at", "wanted",
 ]  # fmt: skip
 NO_ITEMS = "SELECT " + ", ".join(f"NULL AS {c}" for c in ITEM_COLUMNS) + " WHERE 0"  # a home without sources
 
@@ -126,6 +127,7 @@ class Item:
     report: str | None = None  # the last agent run's report, relative to the home's runs/
     downloaded_at: str = ""
     processed_at: str | None = None
+    wanted: str | None = None  # why the owner or a review asked to import it, which a first look then doesn't judge
     containers: tuple[str, ...] = ()  # every place it was found
 
 
@@ -158,6 +160,7 @@ class State:
         self.db.row_factory = sqlite3.Row
         try:
             self._check(path, "main")
+            self._upgrade()
             self.db.executescript(RUNS_SCHEMA)
             for name, folder in archives.items():
                 path = database(folder)
@@ -178,6 +181,15 @@ class State:
         version = self.db.execute(f"PRAGMA {schema}.user_version").fetchone()[0]
         if version > SCHEMA_VERSION:
             raise GleanError(f"{path} was written by a newer glean (schema {version}); update glean")
+
+    def _upgrade(self):
+        """Bring a runs.db of an older glean in line: glean 0.12's outcomes lack `wanted`. In one write transaction, so
+        that a second glean opening it at the same moment waits, then finds it done."""
+        self.db.execute("BEGIN IMMEDIATE")
+        columns = [r[1] for r in self.db.execute("PRAGMA main.table_info(outcomes)")]
+        if columns and "wanted" not in columns:
+            self.db.execute("ALTER TABLE outcomes ADD COLUMN wanted TEXT")
+        self.db.commit()
 
     def __enter__(self):
         return self
@@ -307,15 +319,18 @@ class State:
             )
         return self._again(item)
 
-    def reset(self, item):
+    def reset(self, item, wanted=None):
         """Make an item new again, to be imported again or after all: what its runs made of it is forgotten, their
-        number and records kept, so that its next run knows it is a retry."""
+        number and records kept, so that its next run knows it is a retry. `wanted`: why the owner or a review asks
+        for it to be imported, which it is then without being judged again, until a run imports or skips it."""
         with self.db:
             self.db.execute(
                 f"UPDATE {self._of(item.source)}.items SET status = 'new', reason = NULL WHERE id = ?", (item.id,)
             )
             self.db.execute(
-                "UPDATE outcomes SET status = NULL, reason = NULL WHERE source = ? AND item = ?", (item.source, item.id)
+                "INSERT INTO outcomes (source, item, wanted) VALUES (?, ?, ?) ON CONFLICT (source, item) DO UPDATE SET "
+                "status = NULL, reason = NULL, wanted = excluded.wanted",
+                (item.source, item.id, wanted),
             )
         return self._again(item)
 
@@ -387,10 +402,12 @@ class State:
                 (stamp, outcome, turns, cost_usd, duration_ms, reason, run),
             )
             self.db.execute(
-                "INSERT INTO outcomes VALUES (?, ?, ?, ?, 1, ?, ?, ?) ON CONFLICT (source, item) DO UPDATE SET "
+                "INSERT INTO outcomes (source, item, status, reason, attempts, cost_usd, report, processed_at) "
+                "VALUES (?, ?, ?, ?, 1, ?, ?, ?) ON CONFLICT (source, item) DO UPDATE SET "
                 "status = coalesce(excluded.status, status), reason = excluded.reason, attempts = attempts + 1, "
                 "cost_usd = cost_usd + excluded.cost_usd, report = coalesce(excluded.report, report), "
-                "processed_at = excluded.processed_at",
+                "processed_at = excluded.processed_at, "
+                "wanted = CASE WHEN excluded.status IN ('done', 'skipped') THEN NULL ELSE wanted END",
                 (item.source, item.id, status, reason, cost_usd or 0, report, stamp),
             )
             if document:
