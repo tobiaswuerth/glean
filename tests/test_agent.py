@@ -414,10 +414,18 @@ def test_the_agent_may_judge_an_item_not_worth_importing(tmp_path, fake, mode, v
     assert (result.ok, result.verdict, result.summary) == (True, verdict, "a price alert")
 
 
-def test_a_result_without_its_structured_answer_is_taken_as_imported(tmp_path, fake):
-    fake("unstructured", report="Imported, in words.")
+def test_a_result_without_its_structured_answer_is_asked_for_it_and_then_has_none(tmp_path, fake):
+    # A run said in words that it skipped an email, without the answer tool; glean took it as imported.
+    fake("unstructured", report="Skipped, in words.")
     result = make(tmp_path).run("p", "m")
-    assert (result.ok, result.verdict, result.report) == (True, None, "Imported, in words.")
+    assert (result.ok, result.verdict, result.followups) == (True, None, 2)
+    assert result.checks == [agent.NO_ANSWER]
+
+
+def test_an_answer_given_when_asked_again_counts(tmp_path, fake):
+    fake("unstructured_once")
+    result = make(tmp_path).run("p", "m")
+    assert (result.verdict, result.followups, result.checks) == ("imported", 1, [])
 
 
 def test_stop_ends_every_run_in_progress(tmp_path, fake):

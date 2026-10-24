@@ -205,10 +205,11 @@ claude -p
   returns the answer) and both servers connected, or the run is stopped before its first turn and the item fails with
   the reason.
 - **The answer** is structured: `imported`, `already_imported`, `skipped` (automated mail) or `spam`, a reason in a
-  line, and the report. `skipped` and `spam` make the item skipped, with the agent's reason; the rest done. The result
-  is read whatever happens: success, `error_max_turns`, `error_max_budget_usd`, `error_during_execution`, a timeout, or
-  a crash. The report goes to the item's folder in `runs/`, with any tool calls the sandbox refused; the outcome, turns
-  and cost to `runs.db`.
+  line, and the report. `skipped` and `spam` make the item skipped, with the agent's reason; the rest done. A result
+  without the structured answer goes back to the agent for it, like the checks' findings; still without one, the item
+  fails, never taken as imported. The result is read whatever happens: success, `error_max_turns`,
+  `error_max_budget_usd`, `error_during_execution`, a timeout, or a crash. The report goes to the item's folder in
+  `runs/`, with any tool calls the sandbox refused; the outcome, turns and cost to `runs.db`.
 - **An import is checked before it counts**, from the run's own tool calls: the interaction logged, with every
   address of the item's From, To and Cc (or the report saying why not); every address, person, organization and
   topic `log_interaction` listed as unknown taken up by a later call or the report; sift

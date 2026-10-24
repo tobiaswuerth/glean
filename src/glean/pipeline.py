@@ -335,6 +335,8 @@ def _status(result):
     it automated mail or spam, with its reason; else done."""
     if not result.ok:
         return "failed", result.reason
+    if result.verdict is None:  # never taken as imported: its words may have said otherwise
+        return "failed", "the agent gave no answer"
     if result.verdict in ("skipped", "spam"):
         return "skipped", f"agent: {result.verdict}: {result.summary or 'no reason given'}"
     return "done", None

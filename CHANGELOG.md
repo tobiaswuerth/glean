@@ -5,6 +5,16 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- The import prompt imports the receipt of an application (a job, a course, a place), whose fact goes on Me, and a
+  company's receipt of the owner's request when it quotes the request, the first message of that thread.
+
+### Fixed
+
+- A run whose result came without its structured answer is asked for it again, and without one counts as failed, to
+  try again: it was taken as imported, also where the agent had said in words that it skipped the email.
+
 ## [0.11.1] - 2026-10-24
 
 ### Fixed

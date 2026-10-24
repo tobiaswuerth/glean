@@ -13,6 +13,8 @@ from glean.state import State
 from .conftest import NOW
 from .notes_connector import Notes
 
+IMPORTED = agent.Result("success", True, "Imported.", None, 0.1, 5, 99, verdict="imported")
+
 
 class FakeAgent:
     def __init__(self, results=()):
@@ -25,7 +27,7 @@ class FakeAgent:
         self.runs.append((prompt, message, transcript))
         self.addresses = addresses
         transcript.write_text("{}\n", encoding="utf-8")
-        result = self.results.pop(0) if self.results else agent.Result("success", True, "Imported.", None, 0.1, 5, 99)
+        result = self.results.pop(0) if self.results else IMPORTED
         if isinstance(result, BaseException):
             raise result
         return result
@@ -110,7 +112,11 @@ def test_the_system_prompt_imports_what_people_wrote_and_automated_mail_that_set
     prompt = " ".join(pipeline.system_prompt(cfg, notes).split())
     assert "what a person wrote to people, however short or passing" in prompt
     assert "own request (a contact form, an inquiry, a question about an order or a bill)" in prompt
-    assert "an automated note that settles a lasting fact about the owner" in prompt
+    assert "and its receipt when that quotes the request" in prompt
+    assert (
+        "an automated note that settles a lasting fact about the owner: the receipt of or answer to an application"
+        in (prompt)
+    )
 
 
 def test_the_system_prompt_keeps_facts_about_the_owner_on_me_alone(setup):
@@ -269,10 +275,19 @@ def test_the_system_prompt_takes_a_sender_s_history_as_evidence_only(setup):
     assert "a sender whose notes were skipped can still send one to import" in prompt
 
 
+def test_a_run_without_an_answer_fails_so_that_it_can_be_tried_again(setup):
+    # Taken as imported, it recorded an email the agent had said, in words, to skip.
+    cfg, notes, state = setup
+    fake = FakeAgent([agent.Result("success", True, "Skipped, in words.", checks=[agent.NO_ANSWER])])
+    counts = pipeline.run(cfg, notes, state, fake, pipeline.choose(state, notes, 1), print, print)
+    item = state.find("notes", "a")
+    assert (counts, item.status, item.reason) == ({"failed": 1}, "failed", "the agent gave no answer")
+
+
 def test_refused_tool_calls_are_kept_in_the_report(setup):
     cfg, notes, state = setup
     denied = [{"tool_name": "mcp__orbit__merge_entities", "tool_input": {"keep": "x"}}]
-    fake = FakeAgent([agent.Result("success", True, "Done.", None, 0.1, 3, 9, denied)])
+    fake = FakeAgent([agent.Result("success", True, "Done.", None, 0.1, 3, 9, denied, verdict="imported")])
     said = []
     pipeline.run(cfg, notes, state, fake, pipeline.choose(state, notes, 1, newest=True), said.append, lambda _: None)
     item = state.find("notes", "c")
@@ -583,7 +598,7 @@ def test_runs_that_go_wrong_now_and_then_dont_stop_the_batch(setup, monkeypatch)
     cfg, notes, state = setup
     monkeypatch.setattr(pipeline, "TROUBLE_WINDOW", 2)
     monkeypatch.setattr(pipeline, "TROUBLE_LIMIT", 2)
-    fake = FakeAgent([TURNS, agent.Result("success", True, "Imported.", None, 0.1, 5, 99), TURNS])
+    fake = FakeAgent([TURNS, IMPORTED, TURNS])
     assert pipeline.run(cfg, notes, state, fake, pipeline.choose(state, notes, 3), print, print) == {
         "failed": 2, "done": 1}  # fmt: skip
 
@@ -602,7 +617,7 @@ def test_work_left_undone_and_refused_calls_count_as_going_wrong(setup, monkeypa
     monkeypatch.setattr(pipeline, "TROUBLE_WINDOW", 2)
     monkeypatch.setattr(pipeline, "TROUBLE_LIMIT", 2)
     left = agent.Result("success", True, "Done.", None, 0.1, 3, 9, verdict="imported", checks=["x"])
-    refused = agent.Result("success", True, "Done.", None, 0.1, 3, 9, denied=[{"tool_name": "Bash"}])
+    refused = agent.Result("success", True, "Done.", None, 0.1, 3, 9, [{"tool_name": "Bash"}], verdict="imported")
     with pytest.raises(pipeline.Tripped, match="most often: glean's checks left work undone"):
         pipeline.run(cfg, notes, state, FakeAgent([left, refused]), pipeline.choose(state, notes, 3), print, print)
 

@@ -108,6 +108,7 @@ MIN_VERSION = (2, 1, 290)  # --json-schema's answer kept when the connection dro
 PROBE_SECONDS = 60  # how long the check before a batch may take to start
 EXIT_SECONDS = 15  # how long a run that gave its result may take to exit
 FOLLOWUPS = 2  # how often glean sends a run back with what its checks found left to do
+NO_ANSWER = f"no answer came: give it with the {ANSWER} tool, its outcome, reason and report"
 FOLLOWUP = (
     "glean checked your import, and this is left to do:\n{problems}\n\nDo it with the tools, then give your answer "
     "again. For anything you leave, say in the report why."
@@ -326,7 +327,7 @@ class Agent:
                         result = Result("refused", False, reason=refusal)
                 elif event.get("type") == "result":
                     current = _merged(earlier, _result(event))
-                    left = check(events, event.get("structured_output")) if check and current.ok else []
+                    left = self._left(check, events, event, current) if check and current.ok else []
                     if left and current.followups < FOLLOWUPS:
                         current.sent_back.append(left)
                         message = FOLLOWUP.format(problems="\n".join(f"- {p}" for p in left))
@@ -351,6 +352,12 @@ class Agent:
             with self.lock:
                 self.live.discard(proc)
         return seen, result
+
+    @staticmethod
+    def _left(check, events, event, result):
+        """What an answered run leaves to do: the answer itself, if it came without its schema, or what the checks
+        find."""
+        return check(events, event.get("structured_output")) if result.verdict else [NO_ANSWER]
 
     def _refusal(self, init):
         """Why a run must not go on, from its first event: other tools than allowed, or a server not connected."""
