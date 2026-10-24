@@ -305,6 +305,14 @@ class State:
             self.db.execute(f"UPDATE {self._of(item.source)}.items SET document = ? WHERE id = ?", (document, item.id))
         return self._again(item)
 
+    def set_direction(self, item, direction):
+        """Record whether the owner wrote an item, as their addresses tell now."""
+        with self.db:
+            self.db.execute(
+                f"UPDATE {self._of(item.source)}.items SET direction = ? WHERE id = ?", (direction, item.id)
+            )
+        return self._again(item)
+
     def set_status(self, item, status, reason=None):
         """Set what the download, the skip rules or the owner decided: new, skipped, failed or ignored. What a run made
         of an item stays, and is the item's status, unless it is ignored."""

@@ -27,6 +27,12 @@ FREE_MAIL = frozenset(  # domains that say nothing about who works where
     "outlook.de t-online.de".split()
 )
 
+
+def _rechecked(item):
+    """Whether the skip rules may judge an item again: no agent ran on it, and they or no one set it aside."""
+    return not item.attempts and (item.status == "new" or (item.reason or "").startswith(RULE_REASONS))
+
+
 GUIDE = f"""
 glean reads your mail over IMAP, signed in with OAuth2: Microsoft no longer accepts passwords for IMAP. That needs
 an app registered in Microsoft Entra, which takes a few minutes and is free; its Application (client) ID is what
@@ -200,32 +206,67 @@ class Mail(Connector):
         return True
 
     def upgrade(self, state):
-        """Apply the owner's skip_senders to the mail no agent ran on yet, so that what older gleans' own rules
+        """Bring the mail downloaded before in line with the owner's addresses, once they change; and, once per
+        version, apply the owner's skip_senders to the mail no agent ran on yet, so that what older gleans' own rules
         skipped is new again, and write the documents that mail downloaded before glean wrote them at once lacks."""
         self.contacts = self._contacts(state)  # for the documents' signals
+        self._mine(state)
         if state.mark(self.name, "version") == VERSION:
             return
-        contacts, touched = self.contacts, 0
+        touched = 0
         for item in state.items(self.name):
-            rechecked = not item.attempts and (item.status == "new" or (item.reason or "").startswith(RULE_REASONS))
-            if item.status == "failed" or not (rechecked or item.document is None):
+            if item.status == "failed" or not (_rechecked(item) or item.document is None):
                 continue
             try:
                 parsed = message.parse((self.archive / item.path).read_bytes())
             except Exception:  # an original gone or unreadable stays as it is
                 continue
             before = item
-            if rechecked:
-                contact = any(a.email in contacts for a in parsed.from_)
-                why = skip.reason(parsed, item.direction == "outbound", contact, self.config.skip_senders)
-                if (item.status, item.reason) != ("skipped" if why else "new", why):
-                    item = state.set_status(item, "skipped" if why else "new", why)
+            if _rechecked(item):
+                item = self._rules(state, item, parsed)
             if item.document is None:
                 item = self._write_document(state, item, parsed)
             touched += item != before
         state.set_mark(self.name, "version", VERSION)
         if touched:
             self.say(f"brought {console.count(touched, self.noun)} downloaded before in line with this glean's rules")
+
+    def _mine(self, state):
+        """Bring the mail downloaded before in line with the owner's addresses, once they change: what was sent from
+        an address added is theirs (outbound), its recipients contacts, and no skip rule sets it aside; what was sent
+        from one taken out is someone else's again. Its document says so."""
+        mine = ",".join(sorted(self.config.my_addresses))
+        if state.mark(self.name, "my_addresses") == mine:
+            return
+        turned = 0
+        for item in state.items(self.name):
+            senders = {address.lower() for _, address in email.utils.getaddresses([item.author])}
+            direction = "outbound" if senders & set(self.config.my_addresses) else "inbound"
+            if item.status == "failed" or direction == item.direction:
+                continue
+            item, turned = state.set_direction(item, direction), turned + 1
+            try:
+                parsed = message.parse((self.archive / item.path).read_bytes())
+            except Exception:  # an original gone or unreadable: its direction is all that changes
+                continue
+            if direction == "outbound":
+                state.add_contacts(self.name, self._recipients(parsed))
+                self.contacts |= set(self._recipients(parsed))
+            if _rechecked(item):
+                item = self._rules(state, item, parsed)
+            if item.document:
+                self._write_document(state, item, parsed)
+        state.set_mark(self.name, "my_addresses", mine)
+        if turned:
+            self.say(f"brought {console.count(turned, self.noun)} downloaded before in line with your addresses")
+
+    def _rules(self, state, item, parsed):
+        """Apply the skip rules to an item again; returns it as it is now."""
+        contact = any(a.email in self.contacts for a in parsed.from_)
+        why = skip.reason(parsed, item.direction == "outbound", contact, self.config.skip_senders)
+        if (item.status, item.reason) != ("skipped" if why else "new", why):
+            item = state.set_status(item, "skipped" if why else "new", why)
+        return item
 
     def _contacts(self, state):
         """The addresses the owner has written to, which skip rules never apply to. Kept as outbound mail is stored,

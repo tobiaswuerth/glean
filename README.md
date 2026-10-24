@@ -187,7 +187,7 @@ each version. The settings:
 | `[sift] crm_collection`, `document_collections` | `crm`, all | the vault's collection, and where to look for documents an item refers to |
 | `[sift] add_collections` | on | add and keep the collections of the archive and the vault |
 | `[mail] address`, `client_id` | | the account, and the Entra app's client ID |
-| `[mail] my_addresses` | | your other addresses: mail from them is outbound |
+| `[mail] my_addresses` | | your other addresses: mail from them is outbound, also what was downloaded before you added one |
 | `[mail] folders` | all | read only these folders |
 | `[mail] exclude_folders` | junk, trash, drafts, outbox, notes | more folders to leave out |
 | `[mail] skip_senders` | none | senders whose mail is skipped without an agent run, such as `bot@example.com` or `*@alerts.example` |

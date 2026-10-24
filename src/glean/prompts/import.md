@@ -35,7 +35,8 @@ phishing), answer `skipped` or `spam`, with no tool call.
   a year: applications, offers and answers, registrations, decisions, commitments, changes in work or life, where they
   study or work, the services they hold (an insurance, a hosting plan, a bank). Not their questions, nor their
   purchases. These facts go on Me only, not also on the organization that tells them.
-- **Nothing secret.** No passwords, codes, card, account or ID document numbers, nor health details, even when stated.
+- **Nothing secret.** No passwords, codes, card, account or ID document numbers, even when stated. Health matters (a
+  treatment, an illness, a sick day) are personal facts like any other: record them.
 - **Batch.** Calls that don't need each other's answers go in one turn.
 - **Ask when unsure** with `propose_review`: a wrong match or fact costs more than a question. Asking what the owner
   answered already returns their answer, which stands.

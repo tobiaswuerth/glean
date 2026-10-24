@@ -28,7 +28,8 @@ Start with `link_by_domain`, once: it links people without an organization to th
 2. **The owner as someone else**: a person note that is the owner under another address or a spelling of their
    name: merge it into Me, or, if unsure, propose a review of kind `address` for Me.
 3. **Wrong verdicts**: a {noun} skipped though a person wrote it to people, or though it settles a lasting fact about
-   the owner: under `reimport`, with why; it is imported again without a first look. So too an import that recorded
+   the owner that Me doesn't hold yet (a further bill of a provider Me names settles nothing new): under `reimport`,
+   with why; it is imported again without a first look. So too an import that recorded
    clearly wrong things, once you have undone what you can. One imported that is automated mail and settles no lasting
    fact about the owner (an application, a registration, a service that starts or ends): undo what it recorded that
    isn't so (`retract_observation`, `update_task`), and say so in the report.

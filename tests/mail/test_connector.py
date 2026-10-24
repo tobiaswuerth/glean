@@ -259,9 +259,23 @@ def test_the_instructions_name_the_owners_addresses(tmp_path):
     # Agents linked the owner by address, or by a name of their own, which orbit's Me.md may not have.
     mail, _ = connector(tmp_path, 'my_addresses = ["Tobias.Privat@mail.example"]\n')
     assert (
-        "The owner's addresses are tobias@example.com and tobias.privat@mail.example: wherever one appears, that is "
-        "Me, orbit's note of the owner"
-    ) in mail.instructions()
+        "The owner's addresses are tobias@example.com and tobias.privat@mail.example, and every other address orbit "
+        "resolves to Me: wherever one appears, that is Me, orbit's note of the owner"
+    ) in " ".join(mail.instructions().split())
+
+
+def test_the_instructions_leave_a_shared_mailbox_off_the_person_who_signs(tmp_path):
+    # A team's hr@ and a support address landed on the person who signed, and their later mail with them.
+    text = " ".join(connector(tmp_path)[0].instructions().split())
+    assert (
+        "whoever signs such a message is a person, at that organization, and the address stays off their note" in text
+    )
+
+
+def test_the_instructions_make_one_task_of_a_day_s_vacancies_from_one_sender(tmp_path):
+    # A recruiter sent 24 vacancies in a day; each became a task to answer, which a review then cancelled.
+    text = " ".join(connector(tmp_path)[0].instructions().split())
+    assert "Vacancies or offers someone proposes unasked (a recruiter's list, one per email)" in text
 
 
 def test_a_sender_is_its_address_and_its_organization_s_domain(tmp_path):
@@ -494,6 +508,56 @@ def test_what_was_skipped_before_its_sender_became_a_contact_is_let_in(tmp_path,
     assert (answer.status, answer.reason) == ("new", None)
     assert (mail.archive / answer.document).is_file()
     assert "1 skipped email from people you wrote to: waiting to be imported" in said
+
+
+def test_mail_from_an_address_the_owner_adds_becomes_theirs(tmp_path, state, monkeypatch):
+    # The owner listed five more of their addresses: what they had sent from them stayed inbound, others' mail.
+    root = tmp_path / "eml"
+    root.mkdir()
+    (root / "1.eml").write_bytes(samples.plain(message_id="<own@x>", sender="Tobias <t@own.example>",
+                                               to="hans@acme.example"))  # fmt: skip
+    (root / "2.eml").write_bytes(samples.plain(message_id="<other@x>"))
+    skips = 'skip_senders = ["*@own.example"]\n'  # the notices of the owner's own domain
+    mail, _ = connector(tmp_path, skips, eml=True)
+    mail.download(state)
+    own = state.find("mail", "own@x")
+    assert (own.direction, own.status) == ("inbound", "skipped")
+    mail, said = connector(tmp_path, skips + 'my_addresses = ["T@Own.example"]\n', eml=True)
+    mail.upgrade(state)
+    own = state.find("mail", "own@x")
+    assert (own.direction, own.status, own.reason) == ("outbound", "new", None)  # no rule sets the owner's aside
+    assert 'direction: "outbound"' in (mail.archive / own.document).read_text(encoding="utf-8")
+    assert state.contacts("mail") == {"hans@acme.example"}
+    assert state.find("mail", "other@x").direction == "inbound"
+    assert "brought 1 email downloaded before in line with your addresses" in said
+    monkeypatch.setattr(mail_message, "parse", lambda raw: pytest.fail("no original is read again"))
+    mail.upgrade(state)  # once per change of the addresses
+    monkeypatch.undo()
+    mail, _ = connector(tmp_path, skips, eml=True)  # and taken out again
+    mail.upgrade(state)
+    own = state.find("mail", "own@x")
+    assert (own.direction, own.status) == ("inbound", "skipped")  # someone else's, as the rule says
+
+
+def test_an_email_already_imported_keeps_its_status_when_its_direction_changes(tmp_path, state):
+    root = tmp_path / "eml"
+    root.mkdir()
+    for key in ("done", "gone", "bare"):
+        (root / f"{key}.eml").write_bytes(samples.plain(message_id=f"<{key}@x>", sender="t@own.example"))
+    mail, _ = connector(tmp_path, eml=True)
+    mail.download(state)
+    for key in ("done", "gone"):
+        run = state.start_run(state.find("mail", f"{key}@x"))
+        state.finish_run(run, state.find("mail", f"{key}@x"), status="done", outcome="success", cost_usd=0, turns=1,
+                         duration_ms=1)  # fmt: skip
+    (mail.archive / state.find("mail", "gone@x").path).unlink()  # an original gone: its direction still changes
+    state.set_document(state.find("mail", "bare@x"), None)  # as glean 0.3 left mail: no document yet
+    mail, _ = connector(tmp_path, 'my_addresses = ["t@own.example"]\n', eml=True)
+    mail.upgrade(state)
+    found = {key: state.find("mail", f"{key}@x") for key in ("done", "gone", "bare")}
+    assert {key: (i.direction, i.status) for key, i in found.items()} == {
+        "done": ("outbound", "done"), "gone": ("outbound", "done"), "bare": ("outbound", "new")}  # fmt: skip
+    assert 'direction: "outbound"' in (mail.archive / found["done"].document).read_text(encoding="utf-8")
 
 
 def test_contacts_are_gathered_from_outbound_mail_downloaded_before(tmp_path, state):

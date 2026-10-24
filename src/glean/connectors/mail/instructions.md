@@ -4,8 +4,8 @@ The email is a Markdown file: front matter with its headers (`from`, `to`, `cc`,
 `date`, `subject`, `message_id`, `in_reply_to`, `references`, `direction`, `attachments`, `sha256`), then its text
 as it came, quoted history and signatures included. `direction` is outbound when the owner wrote it.
 
-The owner's addresses are {owner_addresses}: wherever one appears, that is Me, orbit's note of the owner, which links
-name `Me`; never anyone else. If orbit lists one under `unknown_addresses`, add it to Me first (`upsert_person`,
+The owner's addresses are {owner_addresses}, and every other address orbit resolves to Me: wherever one appears, that
+is Me, orbit's note of the owner, which links name `Me`; never anyone else. If orbit lists one under `unknown_addresses`, add it to Me first (`upsert_person`,
 `match: "Me"`). An address that carries the owner's name and acts as theirs (a school or work account, a forward) is
 Me too: link it as Me, and propose a review of kind `address` (candidate Me, that address) for the owner to confirm.
 
@@ -42,7 +42,8 @@ Me too: link it as Me, and propose a review of kind `address` (candidate Me, tha
      relation); a first name alone is not enough.
    - Not people: role addresses (info@, support@, …), a mailbox named after a place, a team or an office
      (zurich@shop.example, kundendienst@…), a mailing list, the system a support desk or job platform sends from.
-     They are the organization's, under `orgs`; whoever signs such a message is a person, at that organization.
+     They are the organization's, under `orgs`; whoever signs such a message is a person, at that organization, and
+     the address stays off their note.
    - Free-mail domains are no organization; an organization's domain includes its subdomains
      (students.school.example is school.example's).
 
@@ -71,7 +72,9 @@ Me too: link it as Me, and propose a review of kind `address` (candidate Me, tha
      stated, the words in `due_note`. An invitation is a task only if the owner must answer it. Each is a task of its
      own, also in a thread with open tasks: never fold it into another's note. If orbit refuses one as like an open task
      of the thread, the email likely changes that one, or is a copy of the email that made it: `update_task` it, or pass
-     `match` if it is another.
+     `match` if it is another. Vacancies or offers someone proposes unasked (a recruiter's list, one per email) make one
+     task a day per sender, to tell them which interest the owner: if `open_tasks` holds that day's, add this one to
+     its note with `update_task`.
 
 5. **Topics**: link the topic the email continues (a project, a deal, an application), found with `resolve_entity` of
    type topic or through the thread; create one only for what clearly runs over several emails.
