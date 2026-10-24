@@ -237,6 +237,15 @@ def test_a_run_hears_how_others_of_its_senders_group_went(tmp_path, monkeypatch)
     assert "From others at shop.example: 1 spam (A lottery.)" in fake.runs[2][1]
 
 
+def test_a_sender_written_in_other_capitals_is_one_sender(tmp_path):
+    cfg, notes = history_setup(tmp_path, ["ÄNNCHEN MÜLLER", "Ännchen Müller"])
+    with State(tmp_path, {"notes": notes.archive}, now=lambda: NOW) as state:
+        notes.download(state)
+        fake = FakeAgent([SKIP, IMPORT])
+        pipeline.run(cfg, notes, state, fake, pipeline.choose(state, notes), print, print)
+    assert "notes from its sender went, evidence about the sender, not about this one: 1 skipped" in fake.runs[1][1]
+
+
 def test_a_sender_whose_name_only_holds_another_s_has_its_own_history(tmp_path):
     cfg, notes = history_setup(tmp_path, ["Joann", "Ann"])
     with State(tmp_path, {"notes": notes.archive}, now=lambda: NOW) as state:
