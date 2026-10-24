@@ -63,8 +63,13 @@ platform. Skip notices of comments in a shared document (Google Docs, Dropbox Pa
    - **Facts**: `add_observation` for lasting facts about the people, organizations and topics (a role, a move, a
      decision, an event someone invites the owner to), and about the owner on Me; not what is passing (a meeting
      room, a parcel's whereabouts). `set_fields` for a single value that changed (a new job title or phone).
-   - **Tasks**: `create_task` for each request or promise of the newest message, even a short reply's. What the owner
-     promised, was asked or has to do (answer a question, attend an interview or appointment, send or prepare
+   - **Open tasks, before new ones**: `log_interaction` lists the open tasks of the thread and of whom the email is with
+     (`open_tasks`). Every one this email settles gets `update_task`, status done or cancelled, with a note: the answer,
+     document, refund or decision came; a reply or a thank-you shows the owner did it; a later step shows it took place
+     (an offer after the interview, a follow-up after the call); the problem was solved or the case closed; it was
+     declined or no longer applies. One this email changes (a new date, more to do) gets `update_task` too.
+   - **Tasks**: then `create_task` for each new request or promise of the newest message, even a short reply's. What the
+     owner promised, was asked or has to do (answer a question, attend an interview or appointment, send or prepare
      something): status open, owner Me. What the owner waits for (an answer, a document, a refund, a decision): status
      waiting, owner that person, or the organization when it is the company's to do (a refund, a fix). Due dates as
      stated, the words in `due_note`. An invitation is a task only if the owner must answer it. Each is a task of its
@@ -72,8 +77,5 @@ platform. Skip notices of comments in a shared document (Google Docs, Dropbox Pa
      of the thread, the email likely changes that one, or is a copy of the email that made it: `update_task` it, or pass
      `match` if it is another.
 
-5. **Topics and open tasks**: link the topic the email continues (a project, a deal, an application), found with
-   `resolve_entity` of type topic or through the thread; create one only for what clearly runs over several emails.
-   `log_interaction` lists the open tasks of the thread and of whom the email is with (`open_tasks`): every one this
-   email settles (the refund came, the files arrived, the question was answered, a thank-you for the answer, the problem
-   was found, the case was closed) gets `update_task`, status done or cancelled, with a note.
+5. **Topics**: link the topic the email continues (a project, a deal, an application), found with `resolve_entity` of
+   type topic or through the thread; create one only for what clearly runs over several emails.

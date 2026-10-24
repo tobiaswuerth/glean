@@ -4,7 +4,7 @@ build-backend = "uv_build"
 
 [project]
 name = "glean-importer"
-version = "0.11.2"
+version = "0.12.0"
 description = "Imports what your sources hold into orbit (a personal CRM) and sift (local RAG search), one sandboxed Claude Code agent run per item. Email works today: IMAP with OAuth2 (Outlook.com, Hotmail) or .eml files."
 readme = "README.md"
 license = "MIT"

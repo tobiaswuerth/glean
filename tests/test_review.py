@@ -124,6 +124,13 @@ def test_a_review_leaves_imported_automated_mail_that_settles_a_fact_about_the_o
     assert "automated mail and settles no lasting fact about the owner (an application, a registration" in prompt
 
 
+def test_a_review_looks_up_the_name_of_a_note_named_after_an_address_handle():
+    # 41 people from mass mail kept names like "davidinacio97"; a later email or a CC list often gives the real one.
+    notes = type("Connector", (), {"noun": "email"})()
+    prompt = " ".join(review.system_prompt(notes, 100, "2026-10-23").split())
+    assert "for a note named after an address handle, search sift for its address first" in prompt
+
+
 def test_a_review_renames_a_note_to_how_the_person_writes_their_name():
     # Names spelled from an address ("Mueller") stayed after a later email showed the person's own ("Müller").
     notes = type("Connector", (), {"noun": "email"})()

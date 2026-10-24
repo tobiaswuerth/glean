@@ -33,9 +33,10 @@ Start with `link_by_domain`, once: it links people without an organization to th
 4. **Misplaced facts**: a task with the wrong owner or status, an observation or field on the wrong note (a fact about
    the owner belongs on Me), a relation that isn't so, a note named after an address handle, a misspelling or how the
    address spells the name where {noun}s show how the person writes it (hansmueller, Mueller: Hans Müller):
-   `rename_entity` it to the name the {noun}s give. Fix what the digests and notes show beyond doubt (`update_task`,
-   `set_fields`, `link_entities`), with `source` "glean review, {date}"; what you can't verify, ask the owner if it
-   matters, else name it in the report.
+   `rename_entity` it to the name the {noun}s give; for a note named after an address handle, search sift for its
+   address first (another {noun}, a CC list or a newsletter often names the person). Fix what the digests and notes show
+   beyond doubt (`update_task`, `set_fields`, `link_entities`), with `source` "glean review, {date}"; what you can't
+   verify, ask the owner if it matters, else name it in the report.
 5. **Tasks a later {noun} settled**: an open or waiting task whose answer, delivery or end a later digest shows (the
    refund came, the case was closed): `update_task` it done or cancelled.
 6. **What only the owner can tell**, as open questions (`propose_review` of kind `question`): who a person is to the

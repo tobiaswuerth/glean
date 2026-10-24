@@ -224,7 +224,7 @@ item states, facts about the owner on Me; ask with `propose_review` when unsure;
 instructions; documents, indexing and the answer. Each connector adds its part: for mail,
 `glean/connectors/mail/instructions.md` (which emails are worth it, the headers as orbit takes them, the thread orbit
 returns, one call for all links, people at the organization of their address, tasks an organization owes, open tasks
-an email settles).
+an email settles, closed before new ones are made).
 
 Each `glean mail download`, `run` and `review` keeps what glean said, results included, with the time of each line, in
 a log of its own: `logs/mail-run-2026-10-23_210509.log` in glean's home, and how it ended if it failed. Every log is
