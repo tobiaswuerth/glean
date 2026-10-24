@@ -5,6 +5,12 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- An email the model's usage policy refuses to read (as it refuses phishing) is skipped with that reason instead of
+  failed, and doesn't count toward the circuit breaker: retrying gets the same refusal, and a stretch of phishing could
+  stop a batch. `glean mail reset` brings one back.
+
 ## [0.12.0] - 2026-10-24
 
 Open tasks an email settles are closed first; the review finds the names of people known by an address handle.

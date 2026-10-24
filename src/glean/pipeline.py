@@ -245,9 +245,11 @@ def _record(connector, state, item, document, run, own, result, counts, say, out
 
 
 def _trouble(result):
-    """What went wrong with a run, in a line; None if nothing did."""
+    """What went wrong with a run, in a line; None if nothing did, or if the model refused what it read."""
+    if result.outcome == "policy_refusal":
+        return None
     if not result.ok:
-        return next(iter((result.reason or "").strip().splitlines()), result.outcome)[:160]
+        return (_first_line(result.reason) or result.outcome)[:160]
     if result.checks:
         return "glean's checks left work undone"
     if result.denied:
@@ -333,6 +335,8 @@ def _last_outcome(state, item):
 def _status(result):
     """An item's status after its run, and why it has it: failed with the run's error, or when no answer came; skipped
     when the agent judged it automated mail or spam, with its reason; else done."""
+    if result.outcome == "policy_refusal":  # it won't read the item, however often asked
+        return "skipped", f"refused by the model's usage policy, as it refuses phishing: {_first_line(result.reason)}"
     if not result.ok:
         return "failed", result.reason
     if result.verdict is None:  # never taken as imported: its words may have said otherwise
@@ -374,3 +378,7 @@ def _checked(result):
     if result.checks:
         lines.append("- still left: " + "; ".join(result.checks))
     return "\n".join(lines)
+
+
+def _first_line(text):
+    return next(iter((text or "").strip().splitlines()), "")

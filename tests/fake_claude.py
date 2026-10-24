@@ -101,6 +101,14 @@ def answer(spec, mode, n):
         emit({"type": "result", "subtype": "error_max_turns", "is_error": True, "num_turns": 60,
               "total_cost_usd": 0.9, "duration_ms": 1000, "errors": [error]})  # fmt: skip
         return
+    if mode == "policy":
+        text = (
+            "API Error: Haiku can't help with this. Start a new session to continue.\n\nLearn more: "
+            "https://www.anthropic.com/legal/aup\n\nDetails: `[x]`"
+        )
+        emit({"type": "result", "subtype": "success", "is_error": True, "result": text, "num_turns": 2,
+              "total_cost_usd": 0, "duration_ms": 5, "terminal_reason": "api_error"})  # fmt: skip
+        return
     if mode == "error_text":
         emit({"type": "result", "subtype": "success", "is_error": True, "result": "API Error: overloaded",
               "num_turns": 1, "total_cost_usd": 0, "duration_ms": 5})  # fmt: skip

@@ -275,6 +275,20 @@ def test_the_system_prompt_takes_a_sender_s_history_as_evidence_only(setup):
     assert "a sender whose notes were skipped can still send one to import" in prompt
 
 
+def test_an_item_the_model_s_usage_policy_refused_is_skipped_and_said_so(setup, monkeypatch):
+    cfg, notes, state = setup
+    monkeypatch.setattr(pipeline, "TROUBLE_WINDOW", 1)
+    monkeypatch.setattr(pipeline, "TROUBLE_LIMIT", 1)
+    refused = agent.Result("policy_refusal", False, reason="API Error: Haiku can't help with this.")
+    counts = pipeline.run(cfg, notes, state, FakeAgent([refused]), pipeline.choose(state, notes, 1), print, print)
+    item = state.find("notes", "a")
+    assert (counts, item.status) == ({"skipped": 1}, "skipped")  # and the breaker didn't trip
+    assert (
+        item.reason
+        == "refused by the model's usage policy, as it refuses phishing: API Error: Haiku can't help with this."
+    )
+
+
 def test_a_run_without_an_answer_fails_so_that_it_can_be_tried_again(setup):
     # Taken as imported, it recorded an email the agent had said, in words, to skip.
     cfg, notes, state = setup
