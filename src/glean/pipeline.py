@@ -16,7 +16,7 @@ from typing import Any
 
 from filelock import FileLock, Timeout
 
-from . import archive, console
+from . import archive, console, review
 from .errors import GleanError
 
 WAIT_SECONDS = 0.5  # how often the main thread looks up from the runs, so that Ctrl+C is heard
@@ -38,17 +38,22 @@ class Tripped(GleanError):
 
 @dataclass(frozen=True)
 class Runners:
-    """The agents of a batch: `triage` takes the first look at each item, `importer` imports what is to be imported."""
+    """The agents of a batch: `triage` takes the first look at each item, `importer` imports what is to be imported,
+    `review` (None: no review) reviews what the runs did, [agent] review_every items at a time."""
 
     triage: Any
     importer: Any
+    review: Any = None
+
+    def _all(self):
+        return [r for r in (self.triage, self.importer, self.review) if r is not None]
 
     def prepare(self):
-        self.triage.prepare()
-        self.importer.prepare()
+        for runner in self._all():
+            runner.prepare()
 
     def stop(self):
-        for runner in (self.triage, self.importer):
+        for runner in self._all():
             if stop := getattr(runner, "stop", None):
                 stop()
 
@@ -57,6 +62,46 @@ class Runners:
 class Prompts:
     triage: str
     imports: str
+
+
+class Reviews:
+    """The reviews of a batch, while the rest of it is imported: one of each `every` items, in their order, once all
+    of them are recorded; one at a time, so that each sees what the one before it fixed. The state database is only
+    touched from the thread that calls `finish` and `step`."""
+
+    def __init__(self, cfg, connector, state, agent, items, say, now=datetime.now):
+        every = cfg.agent.review_every or len(items)
+        self.cfg, self.connector, self.state, self.agent, self.say, self.now = cfg, connector, state, agent, say, now
+        self.groups = deque(items[i : i + every] for i in range(0, len(items), every))
+        self.recorded, self.running = set(), None  # (future, chunk, when)
+        self.pool = ThreadPoolExecutor(max_workers=1)
+
+    def finish(self, item):
+        self.recorded.add(item.id)
+
+    def futures(self):
+        return [self.running[0]] if self.running else []
+
+    def pending(self):
+        return bool(self.running or self.groups)
+
+    def step(self):
+        """Record the review that ended, if one did; then start the next whose items are all recorded."""
+        if self.running and self.running[0].done():
+            future, chunk, when = self.running
+            self.running = None
+            review.record(self.connector, self.state, chunk, future.result(), when, self.say)
+        while self.running is None and self.groups and all(i.id in self.recorded for i in self.groups[0]):
+            chunk = review.digests(self.connector, self.state, self.groups.popleft())
+            if chunk:  # none for items that failed
+                when = self.now()
+                self.say(review.starting(self.cfg, chunk))
+                self.running = (self.pool.submit(self.agent.run, *review.request(self.connector, chunk, when)), chunk,
+                                when)  # fmt: skip
+
+    def close(self):
+        """Wait for the review in progress, stopped or not, and record nothing of it."""
+        self.pool.shutdown(wait=True)
 
 
 @contextmanager
@@ -232,7 +277,8 @@ def run(cfg, connector, state, runners, items, say=console.say, out=print, dry_r
         else:
             entries.append((item, document))
     if entries:
-        _import(connector, state, runners, prompts, entries, parallel, counts, say, out)
+        reviews = runners.review and Reviews(cfg, connector, state, runners.review, [i for i, _ in entries], say)
+        _import(connector, state, runners, prompts, entries, parallel, counts, say, out, reviews)
     return counts
 
 
@@ -256,14 +302,15 @@ def _process(connector, runners, prompts, item, document, own, history, last):
     return look, runners.importer.run(prompts.imports, text, own / "transcript.jsonl", document.addresses)
 
 
-def _import(connector, state, runners, prompts, entries, parallel, counts, say, out):
-    """Run the agents on each entry, as the schedule lets them start; record each outcome as it comes. Ctrl+C, a run
-    that can't start, or most of the last runs going wrong stops every run, and leaves their items as they were."""
+def _import(connector, state, runners, prompts, entries, parallel, counts, say, out, reviews=None):
+    """Run the agents on each entry, as the schedule lets them start; record each outcome as it comes, and review
+    them as `reviews` lets them be. Ctrl+C, a run that can't start, or most of the last runs going wrong stops every
+    run, the review's too, and leaves their items as they were."""
     schedule = Schedule(entries, lambda entry: entry[1].related)
     running, started, recent = {}, 0, deque(maxlen=TROUBLE_WINDOW)
     with ThreadPoolExecutor(max_workers=parallel) as pool:
         try:
-            while schedule.pending():
+            while schedule.pending() or (reviews and reviews.pending()):
                 for item, document in schedule.take(parallel - len(running)):
                     started += 1
                     say(f"[{started}/{len(entries)}] {_label(item)}")
@@ -273,8 +320,9 @@ def _import(connector, state, runners, prompts, entries, parallel, counts, say, 
                     run = state.start_run(item)
                     future = pool.submit(_process, connector, runners, prompts, item, document, own, history, last)
                     running[future] = ((item, document), run, own)
-                done, _ = wait(running, timeout=WAIT_SECONDS, return_when=FIRST_COMPLETED)
-                for future in done:
+                waiting = [*running, *(reviews.futures() if reviews else ())]
+                done, _ = wait(waiting, timeout=WAIT_SECONDS, return_when=FIRST_COMPLETED)
+                for future in (f for f in done if f in running):  # a review's: step records it
                     (item, document), run, own = running.pop(future)
                     schedule.finish((item, document))
                     try:
@@ -284,15 +332,22 @@ def _import(connector, state, runners, prompts, entries, parallel, counts, say, 
                         raise
                     result = _together(look, imported)
                     _record(connector, state, item, document, run, own, result, look, counts, say, out)
+                    if reviews:
+                        reviews.finish(item)
                     recent.append(_trouble(result))
                     if sum(t is not None for t in recent) >= TROUBLE_LIMIT:
                         raise Tripped(_tripped(recent, connector.name))
+                if reviews:
+                    reviews.step()
         except BaseException as e:
             runners.stop()
             wait(running)
             for (item, _), run, _ in running.values():
                 _stopped(state, item, run, e)
             raise
+        finally:
+            if reviews:
+                reviews.close()
 
 
 def _together(look, imported):

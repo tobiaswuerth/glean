@@ -1,6 +1,7 @@
 """Choosing and importing items, the same for every source: shown with a minimal connector of notes."""
 
 import dataclasses
+import re
 import threading
 import time
 
@@ -39,8 +40,8 @@ def looks(results=()):
     return FakeAgent(results, default=WORTH_IT)
 
 
-def runners(importer=None, look=None):
-    return pipeline.Runners(look or looks(), importer or FakeAgent())
+def runners(importer=None, look=None, review=None):
+    return pipeline.Runners(look or looks(), importer or FakeAgent(), review)
 
 
 @pytest.fixture
@@ -745,3 +746,111 @@ def test_a_run_that_cannot_start_stops_the_others_and_is_named(setup):
     with pytest.raises(GleanError, match="can't start"):
         pipeline.run(cfg, notes, state, runners(fake), pipeline.choose(state, notes, 1, newest=True), print, print)
     assert state.find("notes", "c").reason == "stopped: can't start Claude Code (claude): no such file"
+
+
+REVIEWED = agent.Result("success", True, "Nothing wrong.", None, 1.0, 20, 9, answer={})
+
+
+def every(cfg, n):
+    return dataclasses.replace(cfg, agent=dataclasses.replace(cfg.agent, review_every=n))
+
+
+def reviewed(reviewer):
+    """The titles of the items each review saw, in the order the reviews ran."""
+    return [re.findall(r"^### \w+ · [\d-]+ · \w+ · (.+?) · from", message, re.M) for _, message, _ in reviewer.runs]
+
+
+def test_a_review_starts_once_its_items_are_recorded_while_the_rest_are_imported(setup):
+    # Reviews after the batch added a quarter hour to every thousand emails, while the imports had long ended.
+    cfg, notes, state = setup
+    reviewing = threading.Event()
+
+    class Slow(FakeAgent):
+        def run(self, prompt, message, transcript, addresses=()):
+            if "# Third" in message:
+                self.waited = reviewing.wait(timeout=5)
+            return super().run(prompt, message, transcript, addresses)
+
+    class Review(FakeAgent):
+        def run(self, prompt, message, transcript, addresses=()):
+            reviewing.set()
+            return super().run(prompt, message, transcript, addresses)
+
+    importer, reviewer, said = Slow(), Review(default=REVIEWED), []
+    items = pipeline.choose(state, notes, 3)
+    counts = pipeline.run(every(cfg, 2), notes, state, runners(importer, review=reviewer), items, said.append, print,
+                          parallel=3)  # fmt: skip
+    assert counts == {"done": 3}
+    assert importer.waited  # the first two were reviewed while the third was imported
+    assert reviewed(reviewer) == [["First", "Second"], ["Third"]]
+    assert reviewer.prepared == 1
+    assert said.count("reviewing 2 imports with opus") == 1
+    assert any(line.startswith("reviewed 1 import ($1.00): 0 to import again; ") for line in said)
+
+
+def test_reviews_run_one_at_a_time_in_order(setup):
+    cfg, notes, state = setup
+
+    class Review(FakeAgent):
+        active = most = 0
+
+        def run(self, prompt, message, transcript, addresses=()):
+            Review.active += 1
+            Review.most = max(Review.most, Review.active)
+            time.sleep(0.05)
+            Review.active -= 1
+            return super().run(prompt, message, transcript, addresses)
+
+    reviewer = Review(default=REVIEWED)
+    items = pipeline.choose(state, notes, 3)
+    pipeline.run(every(cfg, 1), notes, state, runners(review=reviewer), items, print, print, parallel=3)
+    assert (reviewed(reviewer), Review.most) == ([["First"], ["Second"], ["Third"]], 1)
+
+
+def test_what_a_review_names_is_imported_again_by_the_next_run(setup):
+    cfg, notes, state = setup
+    a = state.find("notes", "a")
+    answer = dataclasses.replace(REVIEWED, answer={"reimport": [{"id": a.id, "why": "Anna Keller wrote it"}]})
+    pipeline.run(every(cfg, 3), notes, state, runners(review=FakeAgent([answer])), [a], print, print)
+    a = state.find("notes", "a")
+    assert (a.status, a.wanted) == ("new", "the review: Anna Keller wrote it")
+
+
+def test_items_with_nothing_to_review_start_no_review(setup):
+    cfg, notes, state = setup
+    broken = agent.Result("error_max_turns", False, "", "Reached maximum number of turns", 0.02, 9, 9)
+    reviewer = FakeAgent(default=REVIEWED)
+    pipeline.run(every(cfg, 1), notes, state, runners(FakeAgent([broken]), review=reviewer),
+                 pipeline.choose(state, notes, 2), print, print)  # fmt: skip
+    assert reviewed(reviewer) == [["Second"]]  # a failed item has no digest
+
+
+def test_ctrl_c_stops_a_review_in_progress_too(setup):
+    cfg, notes, state = setup
+    reviewing = threading.Event()
+
+    class Review(FakeAgent):
+        stopped = False
+
+        def run(self, prompt, message, transcript, addresses=()):
+            reviewing.set()
+            while not self.stopped:
+                time.sleep(0.01)
+            return agent.Result("crashed", False, reason="killed")
+
+        def stop(self):
+            self.stopped = True
+
+    class Interrupted(FakeAgent):
+        def run(self, prompt, message, transcript, addresses=()):
+            if "# Third" in message:
+                reviewing.wait(timeout=5)
+                raise KeyboardInterrupt
+            return super().run(prompt, message, transcript, addresses)
+
+    reviewer = Review()
+    with pytest.raises(KeyboardInterrupt):
+        pipeline.run(every(cfg, 2), notes, state, runners(Interrupted(), review=reviewer),
+                     pipeline.choose(state, notes, 3), print, print, parallel=3)  # fmt: skip
+    assert reviewer.stopped
+    assert not list((notes.home / "runs" / "reviews").glob("*.md"))  # a review cut off reports nothing

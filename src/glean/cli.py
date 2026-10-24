@@ -226,6 +226,17 @@ def _which(args):
     return (args.oldest if args.oldest is not None else args.default_count), False
 
 
+def _runners(args):
+    """The agents of `glean <source> run`: a first look, an import, and, unless none is wanted, a review."""
+    cfg = args.config
+    reviewing = cfg.agent.review_every and not args.no_review
+    return pipeline.Runners(
+        agent.Agent(cfg, role=agent.TRIAGE),
+        agent.Agent(cfg, role=agent.IMPORT),
+        agent.Agent(cfg, role=agent.REVIEW) if reviewing else None,
+    )
+
+
 @logged
 def run_command(connector, args, state):
     count, newest = _which(args)
@@ -237,23 +248,15 @@ def run_command(connector, args, state):
         if not items:
             console.say(f"no {connector.noun}s waiting; `glean {connector.name} download` fetches new ones")
             return 0
-        runner = (
-            None
-            if args.dry_run
-            else pipeline.Runners(
-                agent.Agent(args.config, role=agent.TRIAGE), agent.Agent(args.config, role=agent.IMPORT)
-            )
-        )
+        runners = None if args.dry_run else _runners(args)
         # indexed again: a download stopped before its end leaves what it stored unsearchable
         names = None if args.dry_run else sift.keep(args.config, connector, index=True)
         counts = pipeline.run(
-            args.config, connector, state, runner, items, out=console.show,
+            args.config, connector, state, runners, items, out=console.show,
             dry_run=args.dry_run, names=names, parallel=args.parallel or args.config.agent.parallel,
         )  # fmt: skip
         if counts:
             console.say(", ".join(f"{n} {s}" for s, n in counts.items()))
-        if not args.dry_run and args.config.agent.review_every and not args.no_review:
-            review.run(args.config, connector, state, agent.Agent(args.config, role=agent.REVIEW), items)
     return 1 if counts.get("failed") else 0
 
 

@@ -81,7 +81,7 @@ def test_the_whole_flow(mail_home, capsys):
     assert out.startswith("done    ")
     assert len(out.splitlines()) == 2
     assert "2 done" in err
-    assert err.index("2 done") < err.index("reviewing 2 imports with opus")  # then one review, by a stronger model
+    assert err.index("reviewing 2 imports with opus") < err.index("2 done")  # reviewed in the run, by a stronger model
     assert "reviewed 2 imports ($0.12): 0 to import again;" in err
     code, out, _ = run(capsys, "mail", "list", "--status", "done")
     first = out.splitlines()[-1].split()[0]
