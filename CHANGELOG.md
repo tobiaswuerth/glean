@@ -5,6 +5,8 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-10-25
+
 ### Changed
 
 - The import records health matters (a treatment, an illness, a sick day) as personal facts like any other; its prompt
