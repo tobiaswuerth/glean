@@ -5,6 +5,30 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-10-25
+
+### Changed
+
+- The import records health matters (a treatment, an illness, a sick day) as personal facts like any other; its prompt
+  had it leave them out.
+- The owner's addresses, for an import, are glean.toml's and every other one orbit resolves to Me: runs took the
+  owner's other addresses for strangers'.
+- A shared mailbox (a team's hr@, a support address) stays off the note of the person who signs from it.
+- The vacancies one sender proposes unasked in a day make one task to answer them, not one per email.
+- A review sends a skipped email back to be imported only for a fact about the owner that Me doesn't hold yet: one
+  run's reviews sent three bills of one insurer back, each to show the same.
+
+### Fixed
+
+- Mail downloaded before from an address the owner adds to `my_addresses` becomes theirs, once: outbound, its
+  recipients contacts, set aside by no skip rule, and its document says so; mail from an address taken out is someone
+  else's again. It stayed as it was downloaded. Who wrote it is read from its original's From, never from a display
+  name, and a stop midway is made good the next time.
+- Reading many items (each download's and upgrade's pass over the mailbox) reads their folders in one query, not one
+  per item.
+- An experiment's servers are ended even when one doesn't stop on its own; `.gitignore` keeps a glean home in the
+  repository's own folder out of git.
+
 ## [0.13.0] - 2026-10-24
 
 A first look decides, a stronger model imports, and the reviews run alongside and read what they doubt. Needs orbit

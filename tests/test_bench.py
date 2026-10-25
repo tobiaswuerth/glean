@@ -162,7 +162,7 @@ def test_the_grade_counts_people_across_the_set():
         "c": key(verdict="skip", people=[{"name": "Shop", "emails": [], "role": "from"}]),
     }
     notes = [{"name": "Hans Müller", "emails": ["h@x.ch"]}, {"name": "Hans", "emails": []},
-             {"name": "Tobias W", "emails": ["me@x.ch"]}]  # fmt: skip
+             {"name": "John W", "emails": ["me@x.ch"]}]  # fmt: skip
     confusion = Counter({("import", "import"): 1, ("import", "skip"): 1, ("skip", "skip"): 1})
     grade = bench.summary(Counter(), confusion, keys, items, notes)
     assert grade["people"] == {"expected": 2, "notes": 3, "missing": 1, "duplicated": 1, "asked": 0,

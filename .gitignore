@@ -26,6 +26,12 @@ Thumbs.db
 # Private data: configuration, state, OAuth tokens and the archive, if GLEAN_HOME points into the repo
 data/
 .glean/
+/glean.toml
+/*.db
+/tokens-*.bin
+/mails/
+/runs/
+/logs/
 
 # Local notes, not part of the project
 potential_improvements.md

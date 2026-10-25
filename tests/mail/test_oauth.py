@@ -10,7 +10,7 @@ from glean.errors import GleanError
 
 def opts(**kwargs):
     fields = {
-        "address": "tobias@example.com",
+        "address": "john@example.com",
         "client_id": "cid",
         "authority": options.CONSUMERS,
         "redirect_uri": "http://localhost",
@@ -54,16 +54,16 @@ class App:
         self.accounts.remove(account)
 
 
-SIGNED_IN = {"access_token": "AT", "id_token_claims": {"preferred_username": "tobias@example.com"}}
+SIGNED_IN = {"access_token": "AT", "id_token_claims": {"preferred_username": "john@example.com"}}
 
 
 def test_login_in_the_browser(tmp_path):
     app, said = App(SIGNED_IN), []
     account = oauth.Account(opts(redirect_uri="http://localhost:8400"), tmp_path / "t.bin", app)
-    assert account.login(say=said.append) == "tobias@example.com"
+    assert account.login(say=said.append) == "john@example.com"
     _, scopes, kwargs = app.calls[0]
     assert scopes == oauth.SCOPES
-    assert kwargs["login_hint"] == "tobias@example.com"
+    assert kwargs["login_hint"] == "john@example.com"
     assert kwargs["port"] == 8400
     assert "Opening your browser" in said[0]
 
@@ -97,12 +97,12 @@ def test_signing_in_as_someone_else_warns(tmp_path):
 
 
 def test_tokens_are_refreshed_silently(tmp_path):
-    me = {"username": "tobias@example.com"}
+    me = {"username": "john@example.com"}
     app = App(silent={"access_token": "fresh"}, accounts=[{"username": "x@y"}, me])
     account = oauth.Account(opts(), tmp_path / "t.bin", app)
     assert account.token() == "fresh"
     assert app.calls == [("silent", me)]
-    assert account.signed_in() == "tobias@example.com"
+    assert account.signed_in() == "john@example.com"
 
 
 def test_no_token_without_a_sign_in(tmp_path):
@@ -113,7 +113,7 @@ def test_no_token_without_a_sign_in(tmp_path):
 
 
 def test_an_expired_sign_in(tmp_path):
-    account = oauth.Account(opts(), tmp_path / "t.bin", App(silent=None, accounts=[{"username": "tobias@example.com"}]))
+    account = oauth.Account(opts(), tmp_path / "t.bin", App(silent=None, accounts=[{"username": "john@example.com"}]))
     with pytest.raises(GleanError, match="has expired"):
         account.token()
 

@@ -140,6 +140,15 @@ def test_a_review_reads_the_email_itself_where_its_digest_leaves_doubt():
     assert "`reimport`: each email to import again, its id from the digest's heading and why" in prompt
 
 
+def test_a_review_imports_again_only_what_me_lacks():
+    # Reviews of one run sent three bills of one health insurer back, each to show the same fact.
+    notes = type("Connector", (), {"noun": "email"})()
+    prompt = " ".join(review.system_prompt(notes, 100, "2026-10-23").split())
+    assert (
+        "settles a lasting fact about the owner that Me doesn't hold yet (read Me's note: a further bill of" in prompt
+    )
+
+
 def test_a_review_takes_back_a_fact_that_is_not_so():
     # Facts on the wrong note stayed: a review could add observations, never take one back.
     notes = type("Connector", (), {"noun": "email"})()

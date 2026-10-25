@@ -305,6 +305,14 @@ class State:
             self.db.execute(f"UPDATE {self._of(item.source)}.items SET document = ? WHERE id = ?", (document, item.id))
         return self._again(item)
 
+    def set_direction(self, item, direction):
+        """Record whether the owner wrote an item, as their addresses tell now."""
+        with self.db:
+            self.db.execute(
+                f"UPDATE {self._of(item.source)}.items SET direction = ? WHERE id = ?", (direction, item.id)
+            )
+        return self._again(item)
+
     def set_status(self, item, status, reason=None):
         """Set what the download, the skip rules or the owner decided: new, skipped, failed or ignored. What a run made
         of an item stays, and is the item's status, unless it is ignored."""
@@ -345,7 +353,7 @@ class State:
             f"ORDER BY utc {'DESC' if newest else 'ASC'} LIMIT ?",
             (source, *statuses, -1 if limit is None else limit),
         ).fetchall()
-        return [self._item(r) for r in (reversed(rows) if newest else rows)]
+        return self._items(source, reversed(rows) if newest else rows)
 
     def items(self, source, status=None, limit=None, newest=True):
         """A source's items, newest first, or oldest first."""
@@ -354,7 +362,15 @@ class State:
             f"SELECT * FROM items WHERE {where} ORDER BY utc {'DESC' if newest else 'ASC'} LIMIT ?",
             (*args, -1 if limit is None else limit),
         )
-        return [self._item(r) for r in rows]
+        return self._items(source, rows)
+
+    def _items(self, source, rows):
+        """The items of a source's rows, with their places read at once, not one query per item."""
+        rows, places = list(rows), {}
+        if rows:
+            for item, container in self.db.execute(f"SELECT item, container FROM {self._of(source)}.locations"):
+                places.setdefault(item, set()).add(container)
+        return [Item(**{c: r[c] for c in COLUMNS}, containers=tuple(sorted(places.get(r["id"], ())))) for r in rows]
 
     def get(self, source, ref, normalize=None):
         """An item by its id, the start of its id, or its key."""

@@ -33,9 +33,9 @@ the agent's sandbox, which every change keeps to.
 | `wizard.py` | `glean setup`, also on first use |
 | `settings.py` | `GLEAN_HOME`, the one environment variable, read once |
 | `console.py`, `errors.py` | What glean tells the user, on stderr; `GleanError`, whose message says what to do next |
-| `prompts/import.md` | The agent's system prompt, shared by every source |
+| `prompts/triage.md`, `prompts/import.md` | The first look's and the import's system prompts, shared by every source |
 | `connectors/base.py` | `Connector`, what every source provides, and `Document` |
-| `connectors/mail/` | The mail source: `options.py` (its settings), `mailbox.py` (the interface, and `.eml` folders), `imap.py`, `oauth.py`, `message.py` (parsing), `html.py`, `skip.py` (what headers and senders say, as evidence; the owner's skip_senders), `markdown.py` (the document), `instructions.md` (the agent's part) |
+| `connectors/mail/` | The mail source: `options.py` (its settings), `mailbox.py` (the interface, and `.eml` folders), `imap.py`, `oauth.py`, `message.py` (parsing), `html.py`, `skip.py` (what headers and senders say, as evidence; the owner's skip_senders), `markdown.py` (the document), `triage.md` and `instructions.md` (the first look's and the import's part) |
 
 Results go to stdout from `cli.py` alone; everything else glean says goes to stderr. No module reads the environment
 except `settings.py`.

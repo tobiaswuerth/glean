@@ -154,6 +154,14 @@ def test_the_import_records_what_it_is_sent_unless_it_plainly_is_not_worth_it(se
     assert "Only if reading it all shows it plainly is other automated mail" in prompt
 
 
+def test_the_system_prompt_keeps_secrets_out_and_the_owner_s_health_in(setup):
+    # The owner: health details are relevant personal facts, which must stay in their CRM.
+    cfg, notes, _ = setup
+    prompt = " ".join(pipeline.system_prompt(cfg, notes).split())
+    assert "No passwords, codes, card, account or ID document numbers, even when stated." in prompt
+    assert "Health matters (a treatment, an illness, a sick day) are personal facts like any other" in prompt
+
+
 def test_the_system_prompt_keeps_facts_about_the_owner_on_me_alone(setup):
     # Runs copied the owner's grades and registrations onto the organization that reported them, too.
     cfg, notes, _ = setup

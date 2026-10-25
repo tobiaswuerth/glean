@@ -52,7 +52,7 @@ def test_the_document_and_its_attachments(tmp_path):
     assert f["date"] == "2026-10-15T14:05:00+02:00"
     assert (f["folder"], f["folders"], f["direction"]) == ("Inbox", ["Archive", "Inbox"], "inbound")
     assert f["from"] == "hans.mueller@acme.example"
-    assert f["to"] == ["tobias@example.com"]
+    assert f["to"] == ["john@example.com"]
     assert f["cc"] == ["Lea Frei <lea.frei@acme.example>", "info@acme.example"]
     assert f["sender"] is None
     assert f["in_reply_to"] == "caf1234@mail.acme.example"
@@ -110,7 +110,7 @@ def test_nested_attached_messages_and_cc(tmp_path):
         b"From: a@example.com\r\nSubject: Outer\r\nMIME-Version: 1.0\r\n"
         b'Content-Type: multipart/mixed; boundary="o"\r\n\r\n--o\r\nContent-Type: text/plain\r\n\r\nOuter\r\n'
         b"--o\r\nContent-Type: message/rfc822\r\n\r\n"
-        + inner.replace(b"To: tobias", b"Cc: c@example.com\r\nTo: tobias")
+        + inner.replace(b"To: john", b"Cc: c@example.com\r\nTo: john")
         + b"\r\n--o--\r\n"
     )  # fmt: skip
     doc = markdown.write(message.parse(raw), item(raw), tmp_path, ())

@@ -61,7 +61,12 @@ def serving(root, vault, orbit, port, sift_port):
     finally:
         for server in started:
             server.terminate()
-            server.wait(timeout=10)
+        for server in started:
+            try:
+                server.wait(timeout=10)
+            except subprocess.TimeoutExpired:  # a server that doesn't end on its own is ended
+                server.kill()
+                server.wait()
 
 
 def main():
@@ -76,19 +81,19 @@ def main():
     if root.exists() and any(root.iterdir()):
         raise SystemExit(f"{root} isn't empty: give a new --dir")
     eml, vault, home = root / "eml", root / "crm-test", root / "home"
-    for name, raw in mailbox("tobias@example.com").items():
+    for name, raw in mailbox("john@example.com").items():
         if args.only and not any(Path(name).name.startswith(o) for o in args.only):
             continue
         path = eml / name.replace("Inbox/", "")
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(raw)
     orbit = shutil.which("orbit") or sys.exit("orbit isn't on PATH")
-    subprocess.run([orbit, "init", str(vault), "--name", "Tobias Würth", "--email", "tobias@example.com"], check=True,
+    subprocess.run([orbit, "init", str(vault), "--name", "John Doe", "--email", "john@example.com"], check=True,
                    capture_output=True)  # fmt: skip
     home.mkdir(parents=True)
     (home / "glean.toml").write_text(
         settings(args.port, args.sift_port)
-        + f'[mail]\naddress = "tobias@example.com"\neml_folder = "{eml.as_posix()}"\n',
+        + f'[mail]\naddress = "john@example.com"\neml_folder = "{eml.as_posix()}"\n',
         encoding="utf-8",
     )
     with serving(root, vault, orbit, args.port, args.sift_port) as env:

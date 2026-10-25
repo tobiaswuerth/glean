@@ -7,7 +7,7 @@ from glean.errors import GleanError
 
 MAIL = """
 [mail]
-address = "tobias@example.com"
+address = "john@example.com"
 client_id = "11111111-2222-3333-4444-555555555555"
 """
 
@@ -62,7 +62,7 @@ def test_every_shared_setting_can_be_given(tmp_path):
 def test_each_source_table_is_read_by_its_connector(tmp_path):
     c = config.load(write(tmp_path, MAIL))
     assert list(c.sources) == ["mail"]
-    assert c.sources["mail"].address == "tobias@example.com"
+    assert c.sources["mail"].address == "john@example.com"
     assert c.source("mail").archive == tmp_path / "mails"
 
 
@@ -81,7 +81,7 @@ def test_a_missing_file_says_to_run_setup(tmp_path):
 def test_a_byte_order_mark_is_fine(tmp_path):
     path = tmp_path / "glean.toml"
     path.write_text(MAIL, encoding="utf-8-sig")
-    assert config.load(path).sources["mail"].address == "tobias@example.com"
+    assert config.load(path).sources["mail"].address == "john@example.com"
 
 
 @pytest.mark.parametrize(
